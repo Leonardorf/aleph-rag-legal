@@ -1,0 +1,11 @@
+.env
+__pycache__/
+*.pyc
+.claude/
+.venv/
+
+# Corpus scrapeado — se regenera con scripts/01_scraper.py en adelante,
+# no va al repo público (contenido identifica al organismo fuente)
+data/
+pdfs/
+test_ocr.png

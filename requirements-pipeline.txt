@@ -1,0 +1,15 @@
+# Dependencias del pipeline de datos (scripts/01-08 + poc_groq_nomic.py) — no hacen falta
+# para correr server.py ni para el deploy, solo para regenerar el corpus localmente.
+
+# scripts/01_scraper.py, 01b_ocr_easyocr.py, 05_ocr_textos.py, 08_ocr_pendientes.py
+beautifulsoup4
+pymupdf
+easyocr
+
+# scripts/02_embeddings.py, 04_buscar.py, 06_chunks_subir.py, 07_fix_duplicados.py, poc_groq_nomic.py
+numpy
+pandas
+tqdm
+
+# scripts/05_galaxia.py
+umap-learn

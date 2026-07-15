@@ -1,0 +1,7 @@
+# Dependencias de server.py (lo único que corre en el deploy — Render usa este archivo).
+# Para el pipeline de datos (scraping/OCR/embeddings), instalar también requirements-pipeline.txt.
+flask
+flask-cors
+python-dotenv
+requests
+supabase

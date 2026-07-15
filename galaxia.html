@@ -1,0 +1,1659 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>ALEPH — Visualización Semántica</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #060400; color: #ede0c4; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+    #canvas-container { width: 100vw; height: 100vh; }
+
+    /* ── Header ── */
+    #header {
+      position: fixed; top: 0; left: 0;
+      padding: 18px 24px; z-index: 50;
+    }
+    #header h1 { font-size: 20px; font-weight: 700; color: #f5e6c0; letter-spacing: 1.5px; }
+    #header p  { font-size: 11px; color: rgba(237,224,196,0.35); margin-top: 3px; }
+
+    /* ── Bottom pill toolbar ── */
+    #toolbar {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      z-index: 50; display: flex; flex-direction: row; gap: 2px;
+      padding: 6px 8px;
+      background: rgba(20,12,3,0.92);
+      border: 1px solid rgba(201,162,39,0.2);
+      border-radius: 50px;
+      backdrop-filter: blur(14px);
+    }
+    .toolbar-btn {
+      width: 40px; height: 40px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 50%; border: none; background: transparent;
+      color: rgba(237,224,196,0.45); cursor: pointer; font-size: 17px;
+      transition: background .2s, color .2s;
+    }
+    .toolbar-btn:hover  { background: rgba(201,162,39,0.12); color: #c9a227; }
+    .toolbar-btn.active { background: rgba(201,162,39,0.18); color: #c9a227; }
+
+    /* ── Legend panel ── */
+    #leyenda-panel {
+      position: fixed; bottom: 76px; left: 50%; transform: translateX(-50%);
+      z-index: 50;
+      background: rgba(18,10,3,0.96); border: 1px solid rgba(201,162,39,0.15);
+      border-radius: 10px; padding: 14px 16px;
+      display: none; flex-direction: column; gap: 9px;
+      backdrop-filter: blur(12px); min-width: 185px;
+    }
+    #leyenda-panel.visible { display: flex; }
+    #leyenda-panel .panel-titulo {
+      font-size: 10px; text-transform: uppercase; letter-spacing: 1.3px;
+      color: rgba(201,162,39,0.5); margin-bottom: 4px;
+    }
+    .leyenda-item {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 11px; cursor: pointer; opacity: .85;
+      transition: opacity .2s; white-space: nowrap;
+    }
+    .leyenda-item:hover { opacity: 1; }
+    .leyenda-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    .leyenda-item.inactivo { opacity: .28; }
+
+    /* ── Search bar (top center) ── */
+    #buscar-container {
+      position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+      z-index: 150; width: 580px; max-width: calc(100vw - 160px);
+      display: none; flex-direction: column; gap: 0;
+    }
+    #buscar-container.visible { display: flex; }
+
+    /* Tabs */
+    #buscar-tabs {
+      position: relative; z-index: 5;
+      display: flex; gap: 4px; margin-bottom: 6px; align-self: flex-start;
+    }
+
+    /* Chips sugeridos */
+    #buscar-chips {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      padding: 10px 12px 4px;
+    }
+    #buscar-chips.oculto { display: none; }
+    .chip {
+      padding: 4px 12px; border-radius: 20px; font-size: 11px;
+      background: rgba(201,162,39,0.08); border: 1px solid rgba(201,162,39,0.2);
+      color: rgba(237,224,196,0.65); cursor: pointer;
+      transition: all .18s; white-space: nowrap;
+    }
+    .chip:hover { background: rgba(201,162,39,0.18); color: #c9a227; border-color: rgba(201,162,39,0.4); }
+    .buscar-tab {
+      position: relative;
+      padding: 5px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
+      cursor: pointer; border: 1px solid rgba(201,162,39,0.2);
+      background: rgba(20,12,3,0.85); color: rgba(237,224,196,0.45);
+      backdrop-filter: blur(10px); transition: all .2s; white-space: nowrap;
+    }
+    .buscar-tab:hover { color: #c9a227; border-color: rgba(201,162,39,0.4); }
+    .buscar-tab.activo {
+      background: rgba(201,162,39,0.15); color: #c9a227;
+      border-color: rgba(201,162,39,0.45);
+    }
+    .buscar-tab[data-tip]::after {
+      content: attr(data-tip);
+      position: absolute; top: calc(100% + 8px); left: 0; width: 250px;
+      padding: 8px 10px; border-radius: 8px;
+      background: rgba(15,9,2,0.97); border: 1px solid rgba(201,162,39,0.3);
+      color: rgba(237,224,196,0.85); font-size: 11px; font-weight: 400; line-height: 1.4;
+      white-space: normal; text-align: left;
+      opacity: 0; pointer-events: none; transform: translateY(-4px);
+      transition: opacity .15s, transform .15s; z-index: 200;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+    }
+    .buscar-tab[data-tip]:hover::after { opacity: 1; transform: translateY(0); }
+
+    #buscar-bar {
+      display: flex; align-items: center;
+      background: rgba(20,12,3,0.97); border: 1px solid rgba(201,162,39,0.2);
+      border-radius: 10px; padding: 0 12px; gap: 8px;
+      backdrop-filter: blur(12px);
+    }
+    #buscar-bar .search-icon { font-size: 14px; opacity: .5; flex-shrink: 0; color: #c9a227; }
+    #input-buscar {
+      flex: 1; background: transparent; border: none; outline: none;
+      color: #ede0c4; font-size: 14px; padding: 13px 0;
+    }
+    #input-buscar::placeholder { color: rgba(237,224,196,0.3); }
+    #btn-limpiar-buscar {
+      background: transparent; border: none; color: rgba(237,224,196,0.35);
+      font-size: 14px; cursor: pointer; padding: 4px; border-radius: 4px;
+      display: none; line-height: 1;
+    }
+    #btn-limpiar-buscar:hover { color: #ede0c4; }
+    #btn-limpiar-buscar.visible { display: block; }
+    #btn-buscar-action {
+      background: rgba(201,162,39,0.1); border: 1px solid rgba(201,162,39,0.3);
+      border-radius: 7px; color: #c9a227; font-size: 13px; font-weight: 600;
+      padding: 6px 16px; cursor: pointer; flex-shrink: 0; white-space: nowrap;
+      transition: background .2s;
+    }
+    #btn-buscar-action:hover { background: rgba(201,162,39,0.2); }
+
+    /* Results dropdown — modo Recuperar */
+    #buscar-resultados {
+      background: rgba(18,10,3,0.98); border: 1px solid rgba(201,162,39,0.12);
+      border-radius: 0 0 10px 10px; border-top: none;
+      max-height: 360px; overflow-y: auto; display: none;
+    }
+    #buscar-resultados.visible { display: block; }
+    .resultado-item {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 13px 16px; cursor: pointer; border-bottom: 1px solid rgba(201,162,39,0.07);
+      transition: background .15s;
+    }
+    .resultado-item:last-child { border-bottom: none; }
+    .resultado-item:hover { background: rgba(201,162,39,0.06); }
+    .resultado-icon { font-size: 15px; opacity: .45; flex-shrink: 0; margin-top: 1px; }
+    .resultado-info .r-nombre { font-size: 13px; font-weight: 600; color: #f0e6d0; line-height: 1.35; }
+    .resultado-info .r-tipo   { font-size: 11px; color: rgba(237,224,196,0.38); margin-top: 3px; }
+    .resultado-info .r-titulo { font-size: 11px; color: rgba(237,224,196,0.55); margin-top: 2px; line-height: 1.35; }
+    .no-resultados { padding: 20px 16px; font-size: 13px; color: rgba(237,224,196,0.35); text-align: center; }
+
+    /* Panel RAG — modo Consultar */
+    #consultar-panel {
+      background: rgba(18,10,3,0.98); border: 1px solid rgba(201,162,39,0.18);
+      border-radius: 0 0 12px 12px; border-top: none;
+      display: none; flex-direction: column;
+      max-height: calc(100vh - 140px); overflow-y: auto;
+    }
+    #consultar-panel.visible { display: flex; }
+    #consultar-respuesta {
+      padding: 18px 18px 12px;
+      font-size: 13.5px; color: #ede0c4; line-height: 1.75;
+    }
+    #consultar-loading {
+      padding: 18px; font-size: 13px; color: rgba(201,162,39,0.6);
+      display: none; align-items: center; gap: 10px;
+    }
+    #consultar-loading.visible { display: flex; }
+    .loading-dots span {
+      display: inline-block; width: 5px; height: 5px; border-radius: 50%;
+      background: #c9a227; margin: 0 2px;
+      animation: dot-pulse 1.2s ease-in-out infinite;
+    }
+    .loading-dots span:nth-child(2) { animation-delay: .2s; }
+    .loading-dots span:nth-child(3) { animation-delay: .4s; }
+    @keyframes dot-pulse {
+      0%, 80%, 100% { opacity: .2; transform: scale(.8); }
+      40%           { opacity: 1;  transform: scale(1.2); }
+    }
+    #consultar-fuentes {
+      border-top: 1px solid rgba(201,162,39,0.1);
+      padding: 10px 0 4px;
+    }
+    .fuentes-titulo {
+      font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px;
+      color: rgba(201,162,39,0.5); padding: 0 18px 8px;
+    }
+    .fuente-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 7px 18px; cursor: pointer; transition: background .15s;
+      border-bottom: 1px solid rgba(201,162,39,0.05);
+    }
+    .fuente-item:last-child { border-bottom: none; }
+    .fuente-item:hover { background: rgba(201,162,39,0.06); }
+    .fuente-sim {
+      font-size: 10px; font-weight: 700; color: #c9a227;
+      min-width: 36px; text-align: right; flex-shrink: 0;
+    }
+    .fuente-nombre { font-size: 12px; color: #f0e6d0; font-weight: 600; }
+    .fuente-tipo   { font-size: 10px; color: rgba(237,224,196,0.4); margin-top: 1px; }
+
+    /* ── Filter panel ── */
+    #filtro-panel {
+      position: fixed; bottom: 76px; left: 50%; transform: translateX(-50%);
+      z-index: 50; width: 300px;
+      background: rgba(18,10,3,0.97); border: 1px solid rgba(201,162,39,0.15);
+      border-radius: 10px; padding: 20px;
+      display: none; flex-direction: column; gap: 16px;
+      backdrop-filter: blur(12px);
+    }
+    #filtro-panel.visible { display: flex; }
+    #filtro-panel .filtro-titulo {
+      font-size: 13px; font-weight: 700; color: #f5e6c0;
+    }
+    .filtro-seccion-label {
+      font-size: 11px; font-weight: 600; color: rgba(237,224,196,0.55);
+      margin-bottom: 10px; text-transform: uppercase; letter-spacing: .8px;
+    }
+    .filtro-fila {
+      display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px;
+    }
+    .filtro-input-group { display: flex; flex-direction: column; gap: 4px; }
+    .filtro-input-group label { font-size: 11px; color: rgba(237,224,196,0.4); }
+    .filtro-input {
+      background: rgba(201,162,39,0.06); border: 1px solid rgba(201,162,39,0.15);
+      border-radius: 6px; padding: 8px 10px; color: #ede0c4; font-size: 13px;
+      outline: none; width: 100%;
+    }
+    .filtro-input:focus { border-color: rgba(201,162,39,0.45); }
+    .filtro-tipos-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 10px;
+    }
+    #btn-deseleccionar-todos {
+      font-size: 11px; color: rgba(201,162,39,0.75); cursor: pointer;
+      background: none; border: none; padding: 0;
+      transition: color .2s;
+    }
+    #btn-deseleccionar-todos:hover { color: #c9a227; }
+    #filtro-tipos-lista {
+      max-height: 180px; overflow-y: auto;
+      border: 1px solid rgba(201,162,39,0.1); border-radius: 6px;
+      padding: 4px 0;
+    }
+    .filtro-tipo-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 7px 12px; cursor: pointer;
+      transition: background .15s;
+    }
+    .filtro-tipo-item:hover { background: rgba(201,162,39,0.06); }
+    .filtro-tipo-item input[type="checkbox"] { accent-color: #c9a227; cursor: pointer; }
+    .filtro-tipo-item span { font-size: 12px; color: #ede0c4; }
+    .filtro-botones {
+      display: flex; gap: 10px; margin-top: 4px;
+    }
+    #btn-restablecer {
+      flex: 1; padding: 10px; background: transparent;
+      border: 1px solid rgba(237,224,196,0.15); border-radius: 7px;
+      color: rgba(237,224,196,0.6); font-size: 13px; cursor: pointer;
+      transition: background .2s;
+    }
+    #btn-restablecer:hover { background: rgba(237,224,196,0.06); }
+    #btn-aplicar {
+      flex: 1; padding: 10px;
+      background: rgba(201,162,39,0.12); border: 1px solid rgba(201,162,39,0.3);
+      border-radius: 7px; color: #c9a227; font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: background .2s;
+    }
+    #btn-aplicar:hover { background: rgba(201,162,39,0.22); }
+
+    /* ── Right detail panel ── */
+    #panel-detalle {
+      position: fixed; top: 0; right: -400px; width: 360px; height: 100vh;
+      background: rgba(15,8,2,0.97); border-left: 1px solid rgba(201,162,39,0.12);
+      backdrop-filter: blur(14px); z-index: 200;
+      transition: right .3s cubic-bezier(.4,0,.2,1);
+      overflow-y: auto; padding: 28px 24px 32px;
+    }
+    #panel-detalle.abierto { right: 0; }
+    #btn-cerrar {
+      position: absolute; top: 16px; right: 16px;
+      background: transparent; border: none; color: rgba(237,224,196,0.4);
+      font-size: 18px; cursor: pointer; width: 30px; height: 30px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 6px; transition: background .2s, color .2s;
+    }
+    #btn-cerrar:hover { background: rgba(201,162,39,0.1); color: #c9a227; }
+    #pd-tipo-badge {
+      display: inline-block; padding: 3px 10px; border-radius: 20px;
+      font-size: 10px; font-weight: 700; letter-spacing: .8px;
+      text-transform: uppercase; margin-bottom: 12px;
+    }
+    #pd-titulo { font-size: 15px; font-weight: 700; line-height: 1.45; color: #f5e6c0; margin-bottom: 22px; padding-right: 20px; }
+    .pd-campo { margin-bottom: 14px; }
+    .pd-campo .label { font-size: 10px; text-transform: uppercase; letter-spacing: 1.3px; color: rgba(201,162,39,0.45); margin-bottom: 4px; }
+    .pd-campo .valor { font-size: 13px; color: #ede0c4; line-height: 1.45; }
+    #pd-btn-ver {
+      display: block; width: 100%; margin-top: 26px; padding: 12px;
+      background: rgba(201,162,39,0.1); border: 1px solid rgba(201,162,39,0.28);
+      border-radius: 8px; color: #c9a227; font-size: 13px; font-weight: 600;
+      text-align: center; cursor: pointer; text-decoration: none; transition: background .2s;
+    }
+    #pd-btn-ver:hover { background: rgba(201,162,39,0.2); }
+    #pd-btn-ver.sin-url { opacity: .35; pointer-events: none; }
+
+    /* ── Tooltip ── */
+    #tooltip {
+      position: fixed;
+      background: rgba(15,8,2,0.93); border: 1px solid rgba(201,162,39,0.28);
+      border-radius: 8px; padding: 10px 14px; max-width: 260px;
+      pointer-events: none; display: none; backdrop-filter: blur(8px); z-index: 150;
+    }
+    #tooltip .tipo   { font-size: 9px; text-transform: uppercase; letter-spacing: 1.4px; color: rgba(201,162,39,0.6); margin-bottom: 3px; }
+    #tooltip .nombre { font-size: 12px; font-weight: 600; line-height: 1.35; color: #f0e6d0; }
+
+    /* ── Controls hint ── */
+    #controles {
+      position: fixed; bottom: 16px; right: 18px;
+      font-size: 10px; opacity: .2; text-align: right; line-height: 1.9; z-index: 50;
+    }
+
+    /* ── Disclaimer footer ── */
+    #disclaimer {
+      position: fixed; bottom: 12px; left: 18px;
+      font-size: 10px; color: rgba(255,255,255,0.22);
+      line-height: 1.6; z-index: 50; pointer-events: none;
+      max-width: 420px;
+    }
+
+    /* ── Info modal ── */
+    #info-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+      z-index: 300; display: none; align-items: center; justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+    #info-overlay.visible { display: flex; }
+    #info-modal {
+      background: rgba(18,10,3,0.98); border: 1px solid rgba(201,162,39,0.18);
+      border-radius: 14px; padding: 32px 36px; max-width: 700px; width: 90%;
+      max-height: 85vh; overflow-y: auto; position: relative;
+    }
+    #info-modal .modal-cerrar {
+      position: absolute; top: 16px; right: 16px;
+      background: transparent; border: none; color: rgba(237,224,196,0.4);
+      font-size: 18px; cursor: pointer; width: 30px; height: 30px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 6px;
+    }
+    #info-modal .modal-cerrar:hover { background: rgba(201,162,39,0.1); color: #c9a227; }
+    #info-modal h2 { font-size: 18px; font-weight: 700; color: #f5e6c0; letter-spacing: 1.5px; margin-bottom: 4px; }
+    #info-modal .modal-sub { font-size: 12px; color: rgba(237,224,196,0.4); margin-bottom: 20px; }
+    #info-modal h3 {
+      font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px;
+      color: rgba(201,162,39,0.5); margin: 20px 0 10px;
+    }
+    #info-modal p { font-size: 13px; color: rgba(237,224,196,0.75); line-height: 1.65; }
+    #info-modal ul { list-style: none; padding: 0; }
+    #info-modal ul li {
+      font-size: 12px; color: rgba(237,224,196,0.65); padding: 4px 0;
+      border-bottom: 1px solid rgba(201,162,39,0.07); line-height: 1.5;
+    }
+    #info-modal ul li:last-child { border-bottom: none; }
+    #info-modal ul li strong { color: #f0e6d0; font-weight: 600; }
+    .modal-stat {
+      display: flex; justify-content: space-between; align-items: baseline;
+      padding: 10px 0; border-bottom: 1px solid rgba(201,162,39,0.08);
+    }
+    .modal-stat .s-label { font-size: 12px; color: rgba(237,224,196,0.45); }
+    .modal-stat .s-val   { font-size: 16px; font-weight: 700; color: #c9a227; }
+    .modal-stat .s-val a { color: inherit; text-decoration: none; border-bottom: 1px solid rgba(201,162,39,0.35); }
+    .modal-stat .s-val a:hover { border-bottom-color: #c9a227; }
+    .modal-disclaimer {
+      margin-top: 10px; padding: 12px 14px; border-radius: 8px;
+      background: rgba(201,162,39,0.06); border: 1px solid rgba(201,162,39,0.2);
+    }
+    .modal-disclaimer p { font-size: 12px; color: rgba(237,224,196,0.7); margin: 0; line-height: 1.6; }
+    .modal-disclaimer p + p { margin-top: 8px; }
+    .glosario-item { padding: 12px 0; border-bottom: 1px solid rgba(201,162,39,0.07); }
+    .glosario-item:last-child { border-bottom: none; }
+    .glosario-term { font-size: 13px; font-weight: 700; color: #c9a227; margin-bottom: 4px; }
+    .glosario-def { font-size: 12px; color: rgba(237,224,196,0.75); line-height: 1.6; margin: 0 0 6px; }
+    .glosario-porque { font-size: 12px; color: rgba(237,224,196,0.55); line-height: 1.6; margin: 0; }
+    .glosario-porque strong { color: rgba(237,224,196,0.8); font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<div id="canvas-container"></div>
+
+<!-- Header -->
+<div id="header">
+  <h1>ALEPH</h1>
+  <p>Prototipo de visualización semántica de corpus legal</p>
+</div>
+
+<!-- Bottom pill toolbar -->
+<div id="toolbar">
+  <button class="toolbar-btn" id="btn-ojo"    title="Leyenda de tipos">&#128065;</button>
+  <button class="toolbar-btn" id="btn-buscar-toggle" title="Buscar">&#128269;</button>
+  <button class="toolbar-btn" id="btn-filtro" title="Filtros">&#9661;</button>
+  <button class="toolbar-btn" id="btn-info"   title="Información">&#9432;</button>
+</div>
+
+<!-- Legend panel -->
+<div id="leyenda-panel">
+  <div class="panel-titulo">Tipos de norma</div>
+</div>
+
+<!-- Search bar (top center) -->
+<div id="buscar-container">
+  <div id="buscar-tabs">
+    <button class="buscar-tab" id="tab-recuperar" data-tip="Busca frases reales de las normas con NLP (procesamiento de lenguaje natural). No genera texto ni inventa: solo muestra lo que ya est&aacute; escrito.">&#128269; Recuperar</button>
+    <button class="buscar-tab activo" id="tab-consultar" data-tip="Usa IA generativa (RAG): lee esos fragmentos y redacta una respuesta. Puede resumir o interpretar &mdash; revis&aacute; siempre la fuente citada.">&#10024; Consultar</button>
+  </div>
+  <div id="buscar-bar">
+    <span class="search-icon">&#128269;</span>
+    <input type="text" id="input-buscar" placeholder="Hacé una pregunta sobre las normas..." autocomplete="off" />
+    <button id="btn-limpiar-buscar">&#10005;</button>
+    <select id="buscar-top" title="Cantidad de resultados" style="display:none;background:#180c03;color:#c9a227;border:1px solid rgba(201,162,39,0.25);border-radius:6px;padding:4px 6px;font-size:12px;cursor:pointer;margin-right:4px">
+      <option value="5">5</option>
+      <option value="10" selected>10</option>
+      <option value="20">20</option>
+      <option value="50">50</option>
+    </select>
+    <button id="btn-buscar-action">Consultar</button>
+  </div>
+  <div id="buscar-chips"></div>
+  <div id="buscar-resultados"></div>
+  <div id="consultar-panel">
+    <div id="consultar-loading">
+      Generando respuesta
+      <div class="loading-dots"><span></span><span></span><span></span></div>
+    </div>
+    <div id="consultar-respuesta"></div>
+    <div id="consultar-fuentes">
+      <div class="fuentes-titulo">Fuentes consultadas</div>
+    </div>
+  </div>
+</div>
+
+<!-- Filter panel -->
+<div id="filtro-panel">
+  <div class="filtro-titulo">Filtros de visualización</div>
+
+  <div>
+    <div class="filtro-seccion-label">Año de sanción</div>
+    <div class="filtro-fila">
+      <div class="filtro-input-group">
+        <label>Desde:</label>
+        <input class="filtro-input" type="number" id="anio-desde" placeholder="ej. 2018" min="1900" max="2099" />
+      </div>
+      <div class="filtro-input-group">
+        <label>Hasta:</label>
+        <input class="filtro-input" type="number" id="anio-hasta" placeholder="ej. 2026" min="1900" max="2099" />
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="filtro-tipos-header">
+      <div class="filtro-seccion-label" style="margin-bottom:0">Tipo de Norma</div>
+      <button id="btn-deseleccionar-todos">Deseleccionar todos</button>
+    </div>
+    <div id="filtro-tipos-lista"></div>
+  </div>
+
+  <div class="filtro-botones">
+    <button id="btn-restablecer">Restablecer</button>
+    <button id="btn-aplicar">Aplicar</button>
+  </div>
+</div>
+
+<!-- Right detail panel -->
+<div id="panel-detalle">
+  <button id="btn-cerrar">&#10005;</button>
+  <div id="pd-tipo-badge"></div>
+  <div id="pd-titulo"></div>
+  <div id="pd-campos"></div>
+  <a id="pd-btn-ver" href="#" target="_blank">Ver documento</a>
+</div>
+
+<!-- Tooltip -->
+<div id="tooltip">
+  <div class="tipo"   id="tt-tipo"></div>
+  <div class="nombre" id="tt-nombre"></div>
+</div>
+
+<!-- Info modal -->
+<div id="info-overlay">
+  <div id="info-modal">
+    <button class="modal-cerrar" id="btn-cerrar-info">&#10005;</button>
+    <h2>ALEPH</h2>
+    <div class="modal-sub">Prototipo experimental de visualización semántica de corpus legal</div>
+
+    <h3>Sobre ALEPH</h3>
+    <p>
+      En el cuento de Borges, el Aleph es el punto del espacio que contiene todos los puntos:
+      desde él se puede ver, simultáneamente, todo el universo.
+    </p>
+    <p style="margin-top:10px;">
+      Aquí, cada estrella es un documento legal — Ley, Decreto, Resolución, Orden de Servicio, Dictamen —
+      y su posición en el espacio refleja su lugar en el universo semántico del derecho registral.
+      Los documentos que orbitan cerca comparten significado; los distantes, mundos distintos.
+    </p>
+    <p style="margin-top:10px;">
+      En términos concretos: es un buscador de normativa registral que entiende consultas en lenguaje
+      natural (por ejemplo, <em>"cancelación de inhibición"</em> o <em>"zonas de frontera"</em>),
+      sin necesidad de conocer el número o nombre exacto de la norma.
+    </p>
+
+    <h3>Para profesionales y público interesado</h3>
+    <p>
+      Pensado tanto para quienes trabajan en el ámbito jurídico-registral como para cualquier
+      persona interesada en cómo la búsqueda semántica y la IA generativa pueden aplicarse a
+      un corpus legal.
+    </p>
+    <ul>
+      <li><strong>Qué cubre:</strong> Leyes, Decretos, Resoluciones Administrativas, OSC, OSA, Dictámenes,
+        DTR y Acordadas vinculadas al régimen registral y de derecho inmobiliario.</li>
+      <li><strong>Cómo usarlo:</strong> buscá por tema o situación (tecla <strong>B</strong>) — al
+        seleccionar un resultado se resalta su estrella en el mapa y se habilita
+        <strong>"Ver documento"</strong> con el PDF oficial.</li>
+      <li><strong>Qué no reemplaza:</strong> el Boletín Oficial, el sistema de gestión documental
+        oficial del organismo competente, ni el asesoramiento legal profesional.</li>
+    </ul>
+
+    <h3>Ventajas frente a la búsqueda tradicional</h3>
+    <ul>
+      <li>No hace falta saber el número exacto de la norma (buscás "qué pasa si el titular de un
+        inmueble falleció", no "Ley 8236 Art. 115").</li>
+      <li>Cada respuesta cita la norma de origen, verificable contra el PDF original.</li>
+      <li>Ahorra leer el documento entero — trae el fragmento puntual.</li>
+      <li>Cruza varias normas relacionadas en una sola consulta.</li>
+      <li>No inventa lo que no está: si no hay info, lo dice en vez de alucinar.</li>
+      <li>Entiende la situación aunque no compartas las palabras exactas del texto legal — usa
+        procesamiento de lenguaje natural (NLP) para comparar el significado de tu consulta con
+        el de cada norma, no si aparecen literalmente las mismas palabras (ej: "vender un campo
+        cerca del límite con Chile" encuentra la normativa de zona de seguridad de frontera sin
+        usar esos términos).</li>
+      <li>Encuentra contenido en documentos escaneados, donde un Ctrl+F normal no encontraría nada.</li>
+      <li>Prioriza por relevancia a tu consulta, no por fecha ni orden alfabético.</li>
+    </ul>
+
+    <div class="modal-disclaimer">
+      <p>
+        <strong>Verificá siempre la fuente:</strong> las respuestas de la consulta asistida (RAG)
+        son un resumen orientativo generado por un modelo de lenguaje a partir de fragmentos de las
+        normas. Pueden omitir matices o contener imprecisiones — antes de aplicar un criterio,
+        contrastá con el texto completo de la norma citada.
+      </p>
+    </div>
+
+    <h3>Alcance del corpus</h3>
+    <div class="modal-stat">
+      <span class="s-label">Fuente</span>
+      <span class="s-val"><a href="https://jusmendoza.gob.ar/direccion-de-registros-publicos-y-archivo-judicial-circunscripciones/" target="_blank" rel="noopener noreferrer">jusmendoza.gob.ar</a></span>
+    </div>
+    <div class="modal-stat">
+      <span class="s-label">Datos actualizados a</span>
+      <span class="s-val">1er semestre 2026</span>
+    </div>
+    <p style="margin-top:10px;">
+      Todos los documentos son <strong>datos públicos</strong>, extraídos automáticamente de un
+      portal de normativa provincial — no se procesa ni almacena información confidencial ni
+      de acceso restringido.
+    </p>
+
+    <h3>Glosario</h3>
+    <div class="glosario-item">
+      <div class="glosario-term">Embeddings</div>
+      <p class="glosario-def">Una representación numérica del significado de un texto: cada norma se convierte en un vector de números que captura de qué trata, no las palabras exactas que usa.</p>
+      <p class="glosario-porque"><strong>Por qué lo usamos:</strong> permite encontrar normas por tema aunque no compartan ninguna palabra literal con la búsqueda — por eso "cancelación de inhibición" encuentra la Resolución aunque el usuario escriba distinto.</p>
+    </div>
+    <div class="glosario-item">
+      <div class="glosario-term">UMAP</div>
+      <p class="glosario-def">Una técnica que toma esos vectores de cientos de dimensiones y los reduce a solo 3, conservando qué tan parecidos son entre sí.</p>
+      <p class="glosario-porque"><strong>Por qué lo usamos:</strong> es lo único que hace posible <em>ver</em> el corpus como un mapa de estrellas — sin esta reducción, cada norma seguiría siendo una lista de números imposible de graficar.</p>
+    </div>
+    <div class="glosario-item">
+      <div class="glosario-term">RAG (recuperación + generación)</div>
+      <p class="glosario-def">En vez de que el modelo de IA responda de memoria, primero busca los fragmentos de normas más relevantes para la consulta y arma la respuesta solo a partir de ellos.</p>
+      <p class="glosario-porque"><strong>Por qué lo usamos:</strong> ancla la respuesta al texto real de la normativa registral en lugar de a lo que el modelo "cree" saber, reduciendo el riesgo de que invente contenido.</p>
+    </div>
+    <div class="glosario-item">
+      <div class="glosario-term">pgvector</div>
+      <p class="glosario-def">Una extensión de PostgreSQL (la base de datos detrás de Supabase) que sabe guardar y comparar vectores de embeddings directamente con SQL.</p>
+      <p class="glosario-porque"><strong>Por qué lo usamos:</strong> evita tener que mantener un motor de búsqueda separado solo para la parte semántica.</p>
+    </div>
+    <div class="glosario-item">
+      <div class="glosario-term">Similitud coseno</div>
+      <p class="glosario-def">La medida matemática que indica cuán parecidos son dos vectores — en este caso, dos normas o una norma y una consulta.</p>
+      <p class="glosario-porque"><strong>Por qué lo usamos:</strong> es el criterio que ordena los resultados de búsqueda de más a menos relevante.</p>
+    </div>
+
+    <h3>Proceso de Visualización</h3>
+    <p>
+      Cada documento fue procesado con un modelo de embeddings para representarlo como vector en un espacio de alta dimensión,
+      capturando su contenido semántico. Mediante UMAP se redujeron a 3 dimensiones preservando la estructura semántica.
+      La distancia entre estrellas refleja cuán similares son los documentos en contenido y temática.
+    </p>
+    <p>
+      La búsqueda semántica (RAG) recupera los documentos más similares a la consulta sin depender de coincidencias exactas de palabras clave.
+      El sistema utiliza únicamente modelos de recuperación (no generativos) para garantizar resultados precisos y auditables.
+    </p>
+
+    <h3>Controles</h3>
+    <ul>
+      <li><strong>Rotar:</strong> arrastrar con el mouse</li>
+      <li><strong>Zoom:</strong> rueda del mouse</li>
+      <li><strong>Seleccionar:</strong> clic sobre una estrella</li>
+      <li><strong>Búsqueda:</strong> tecla <strong>B</strong> o ícono lupa</li>
+      <li><strong>Filtros:</strong> tecla <strong>F</strong> o ícono embudo</li>
+      <li><strong>Leyenda:</strong> tecla <strong>L</strong> o ícono ojo</li>
+      <li><strong>Información:</strong> tecla <strong>I</strong> o ícono ⓘ</li>
+      <li><strong>Cerrar paneles:</strong> tecla <strong>Escape</strong></li>
+    </ul>
+
+    <h3>Características</h3>
+    <div class="modal-stat">
+      <span class="s-label">Total de normativas</span>
+      <span class="s-val">77</span>
+    </div>
+    <div class="modal-stat">
+      <span class="s-label">Tipos de norma</span>
+      <span class="s-val">11</span>
+    </div>
+    <h3>Tecnología</h3>
+    <div class="modal-stat">
+      <span class="s-label">Embeddings</span>
+      <span class="s-val">nomic-embed-text (768 dims)</span>
+    </div>
+    <div class="modal-stat">
+      <span class="s-label">Generación (RAG)</span>
+      <span class="s-val">Llama 3.2 · 3B (local)</span>
+    </div>
+    <div class="modal-stat">
+      <span class="s-label">Reducción dimensional</span>
+      <span class="s-val">UMAP 3D</span>
+    </div>
+    <div class="modal-stat">
+      <span class="s-label">Búsqueda semántica</span>
+      <span class="s-val">pgvector · similitud coseno</span>
+    </div>
+    <div class="modal-stat">
+      <span class="s-label">Visualización</span>
+      <span class="s-val">Three.js (WebGL)</span>
+    </div>
+
+    <div class="modal-disclaimer" style="margin-top:24px;">
+      <p>
+        Prototipo experimental, 2026, para explorar búsqueda semántica, RAG y visualización de
+        embeddings sobre un corpus legal chico — no es un producto en producción ni una
+        herramienta oficial de ningún organismo.
+      </p>
+      <p>
+        Los datos provienen de fuentes públicas de normativa registral y de derecho inmobiliario.
+        Las respuestas generadas por el modelo de IA (RAG) son un resumen orientativo a partir de
+        fragmentos de las normas — pueden omitir matices o contener imprecisiones, y no reemplazan
+        la lectura del texto completo de la norma citada ni el asesoramiento legal profesional.
+      </p>
+    </div>
+
+    <p style="margin-top:16px; font-size:11px; color:rgba(255,255,255,0.3); text-align:right;">
+      Desarrollado por Ing. Leonardo Villegas ·
+      <a href="https://github.com/Leonardorf/aleph-rag-legal" target="_blank" rel="noopener noreferrer"
+         style="color:rgba(201,162,39,0.7); text-decoration:none; border-bottom:1px dotted rgba(201,162,39,0.4);">
+        código en GitHub
+      </a><br>
+      Prototipo experimental · 2026
+    </p>
+  </div>
+</div>
+
+<!-- Controls -->
+<div id="controles">
+  Arrastrar — rotar<br>Scroll — zoom<br>Click — detalle
+</div>
+
+<!-- Disclaimer -->
+<div id="disclaimer">
+  Prototipo experimental. Los datos provienen de fuentes públicas<br>de normativa registral y de derecho inmobiliario.
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ── Escena ───────────────────────────────────────────────────
+const scene  = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 2000);
+camera.position.set(0, 0, 130);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(devicePixelRatio);
+renderer.setSize(innerWidth, innerHeight);
+document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+// Estrellas de fondo
+const starsGeo = new THREE.BufferGeometry();
+const starPos  = new Float32Array(3000);
+for (let i = 0; i < 3000; i++) starPos[i] = (Math.random() - 0.5) * 1800;
+starsGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+scene.add(new THREE.Points(starsGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.4, transparent: true, opacity: 0.4 })));
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+
+// ── Rotación / zoom ──────────────────────────────────────────
+let isDragging = false, prevX = 0, prevY = 0, rotX = 0, rotY = 0;
+let focusAnim = null;
+let selectedMeshIdx = -1;
+let pings = [];
+let tipoHover = null;
+let pulsoAnimaciones = [];
+let tipoPulsoIdx = 0;
+
+const ringTextura = (() => {
+  const size = 128, canvas = document.createElement('canvas');
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.beginPath();
+  ctx.arc(size/2, size/2, size/2 - 6, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255,255,255,1)';
+  ctx.lineWidth = 10;
+  ctx.stroke();
+  return new THREE.CanvasTexture(canvas);
+})();
+const pivot = new THREE.Group();
+scene.add(pivot);
+
+function crearPing(pos, color, delay) {
+  setTimeout(() => {
+    const mat = new THREE.SpriteMaterial({
+      map: ringTextura, color: new THREE.Color(color),
+      transparent: true, opacity: 1.0,
+      depthWrite: false, blending: THREE.AdditiveBlending,
+    });
+    const s = new THREE.Sprite(mat);
+    s.position.copy(pos);
+    s.scale.set(4, 4, 1);
+    pivot.add(s);
+    pings.push({ sprite: s, mat, t0: performance.now(), dur: 2500, endScale: 28 });
+  }, delay);
+}
+
+function resetSelectedMesh() {
+  if (selectedMeshIdx < 0) return;
+  const m = meshes[selectedMeshIdx];
+  m.scale.setScalar(1);
+  if (halos[selectedMeshIdx]) {
+    halos[selectedMeshIdx].mesh.scale.set(5, 5, 1);
+    if (halos[selectedMeshIdx].outline) halos[selectedMeshIdx].outline.scale.setScalar(1);
+  }
+  resetearNodoPalido(m, selectedMeshIdx);
+  selectedMeshIdx = -1;
+}
+
+function focusNodo(mesh) {
+  resetSelectedMesh();
+  const idx = mesh.userData.idx;
+  selectedMeshIdx = idx;
+
+  // Iluminar nodo seleccionado con su color vívido
+  const color = mesh.userData.colorVivid || puntos[idx]?.color || '#ffffff';
+  iluminarNodo(mesh, idx, color, 1.2);
+  mesh.scale.setScalar(2.2);
+  if (halos[idx]) {
+    halos[idx].mesh.scale.set(14, 14, 1);
+    if (halos[idx].outline) halos[idx].outline.scale.setScalar(2.2);
+  }
+
+  // Pings tipo sonar
+  crearPing(mesh.position, color, 0);
+  crearPing(mesh.position, color, 700);
+  crearPing(mesh.position, color, 1400);
+
+  // Animación de cámara
+  const wp = new THREE.Vector3();
+  mesh.getWorldPosition(wp);
+  const ndc = wp.clone().project(camera);
+  focusAnim = {
+    rotXTarget: rotX + ndc.y * 0.7,
+    rotYTarget: rotY - ndc.x * 0.7,
+    zTarget: 75,
+  };
+}
+
+renderer.domElement.addEventListener('mousedown', e => { isDragging = true; focusAnim = null; prevX = e.clientX; prevY = e.clientY; });
+renderer.domElement.addEventListener('mouseup',   () => isDragging = false);
+renderer.domElement.addEventListener('mousemove', e => {
+  if (!isDragging) return;
+  rotY += (e.clientX - prevX) * 0.005;
+  rotX += (e.clientY - prevY) * 0.005;
+  prevX = e.clientX; prevY = e.clientY;
+  pivot.rotation.y = rotY; pivot.rotation.x = rotX;
+});
+window.addEventListener('wheel', e => {
+  e.preventDefault();
+  camera.position.z = Math.max(40, Math.min(400, camera.position.z + e.deltaY * 0.2));
+}, { passive: false });
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ── Datos ────────────────────────────────────────────────────
+let puntos = [], meshes = [], halos = [];
+let etiquetasCluster = {};
+let filtroTipos = new Set();
+let filtroAnioDesde = null, filtroAnioHasta = null;
+let checkboxesTipo = {};
+const ESCALA = 0.45;
+const haloTextura = (() => {
+  const size = 64, canvas = document.createElement('canvas');
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const grad = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+  grad.addColorStop(0,    'rgba(255,255,255,1)');
+  grad.addColorStop(0.25, 'rgba(255,255,255,0.6)');
+  grad.addColorStop(0.6,  'rgba(255,255,255,0.15)');
+  grad.addColorStop(1,    'rgba(255,255,255,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+  return new THREE.CanvasTexture(canvas);
+})();
+
+const _data = {"puntos":[{"id":1,"nombre":"Resolución Administrativa 07/26","tipo":"Resolución Administrativa","anio":"2026.0","tema":"nan","titulo":"Resolución Administrativa RA N° 07/26 – Implementación de turnero web Archivo y Asesoría Letrada Registral","resumen":"PODER JUDICIAL MENDOZA SUPREMA CORTE DE JUSTICIA DIRECCIÓN DE REGISTROS PÚBLICOS Y ARCHIVO JUDICIAL 84  CIRCUNSCRIPCION JUDICIaL IMPLEMENTACIÓN DE TURNERO WEB ARCHIVO Y ASESORIA LETRADA REGISTRAL La implementación de los nuevos procesos digitales que se viene llevando a cabo en esta DRP Que para una mejor   prestación del servicio una mejor organización interna, resulta conveniente el establecimiento de turneros web para el archivo de protocolos en el área de Archivo Judicial y para la atención a profesionales en el área de Coordinación Jurídica- Asesoría Letrada Registral. 1 - Implementar a p","url":"https://jusmendoza.gob.ar/wp-content/uploads/2026/06/Resolucion-Administrativa-RA-N°-07-26-Implementacion-de-turnero-web-Archivo-y-Asesoria-Letrada-Registral.pdf","color":"#a5d6a7","x":-0.28670501708984375,"y":-38.937538146972656,"z":86.43724060058594},{"id":2,"nombre":"Resolución Administrativa 06/26","tipo":"Resolución Administrativa","anio":"2026.0","tema":"nan","titulo":"Resolución Administrativa RA N° 06/26 –Modificación de Anexo I RA N° 04/26– Principio de Rogación – Aplicación","resumen":"PODER JUDICIAL MENDOZA SUPREMA CORTE DE JUSTICIA DIRECCIÓN DE REGISTROS PÚBLICOS Y ARCHIVO IUDICIAL CIRCUNSCRIPCION IUDI(:4L RA NRO. 06/26 MODIFICACIÓN DE ANEXO APLICACIÓN Que la RA 04/26 dispuso que partir del 01 de Junio de 2026 sería de aplicación estricta el principio de rogación previsto en los artículos 6 de la Ley 17801 y 7 de la Ley 8236, por lo que no se tomará razón de los actos que no se encuentren  expresamente incluidos en la rogatoria, formato digital ylo papel. Que, además; aprobó el Formulario Rogatoria para documentos notariales, presentado como Anexo I de la Resolución citada","url":"https://jusmendoza.gob.ar/wp-content/uploads/2026/06/Resolucion-Administrativa-RA-N°-06-26-Modificacion-de-Anexo-I-RA-N°-4-26-Principio-de-Rogacion-Aplicacion.pdf","color":"#a5d6a7","x":14.626571655273438,"y":-43.56126022338867,"z":87.6502685546875},{"id":3,"nombre":"Resolución Administrativa 05/26","tipo":"Resolución Administrativa","anio":"2026.0","tema":"nan","titulo":"Resolución Administrativa RA N° 05/26 – Informes digitales de titularidad, inhibición y estado jurídico del inmueble","resumen":"PODER JUDICIAL MENDOZA SCPREMA CORTE DE JUSTICIA DIRECCIÓX DE REGISTROs PCBLICOS F ARCHIFO JUDICIAL CsClavr5r? 286 RANRO 05/26 INFORMES DIGITAL DE TITULARIDAD, INHIBICIÓN Y ESTADO JURÉDICO DEL INMUEBLE. La necesidad de reorganización de procesos en el marco de los objetivos establecidos por la Dirección para el Proyecto de Modernización del Registro de la Propiedad Inmueble de la Provincia de Mendoza. Que se ha implementado la posibilidad de solicitar informes de titularidad, de inhibición y de estado jurídico del inmueble por medios totalmente digitales desde del 18 de agosto de 2025, 12 de a","url":"https://jusmendoza.gob.ar/wp-content/uploads/2026/05/Resolucion-Administrativa-RA-N°-05-24-Informes-digitales-de-titularidad-inhibicion-y-estado-juridico-del-inmueble.pdf","color":"#a5d6a7","x":7.6902618408203125,"y":-50.65267562866211,"z":82.33601379394531},{"id":4,"nombre":"Resolución Administrativa 04/26","tipo":"Resolución Administrativa","anio":"2026.0","tema":"nan","titulo":"Resolución Administrativa RA N° 04/26 – Principio de Rogación – Aplicación","resumen":"Sra. Directora por la presente solicito inscriba: B. DATOS DEL SOLICITANTE Y AUTORIZADO PARA SU RETIRO: D. INMUEBLES INVOLUCRADOS — TIPO DE ACTO — PARTES: TIPO DE ACTO (Acto no rogado / Acto no registrado) ACEPTANTES (Por derecho propio y/o por representación) (llenar solo por el personal del registro)","url":"https://jusmendoza.gob.ar/wp-content/uploads/2026/04/Resolucion-Administrativa-RA-N°-04-26.pdf","color":"#a5d6a7","x":24.67058563232422,"y":-47.505611419677734,"z":87.97572326660156},{"id":5,"nombre":"Resolución Administrativa 03/26","tipo":"Resolución Administrativa","anio":"2026.0","tema":"nan","titulo":"Resolución Administrativa RA N° 03/26 – Cancelación de Inhibición con firma digital","resumen":"CANCELACIÓN  DE INHIBICIÓN CON FIRMA DIGITAL. La necesidad de reorganización de procesos en el marco de los objetivos establecidos por la Dirección para el Proyecto de Modernización de la Dirección de Registros Públicos y Archivo Judicial de la 1°, 3° y 4° Circunscripción Judicial. Que a partir del 9 de Octubre del 2025 se ha implementado la posibilidad de realizar la cancelación de las medidas cautelares de inhibición por medios totalmente digitales,","url":"https://jusmendoza.gob.ar/wp-content/uploads/2026/04/Resolucion-Administrativa-RA-N°-03.26-Cancelacion-de-inhibicion-con-firma-digital.pdf","color":"#a5d6a7","x":5.9757232666015625,"y":-32.94635772705078,"z":83.91648864746094},{"id":6,"nombre":"Resolución Administrativa 03/24","tipo":"Resolución Administrativa","anio":"2024.0","tema":"nan","titulo":"Resolución Administrativa RA N° 03/24 – Implementación Certificados en soporte papel","resumen":"PODER JUDICIAL MENDOZA SUPREMA CORTE DE JUSTICIA [IRECCIÓN DF RIG;ISTROS PÚBLI(OS Y ARCTIVO) JUDICIAL (le:t\"wso RIn J() W:cal RA-03-24~IMPLEMENTACION CERTIFICADOS EN SOPORTE PAPEL VISTO Y CONSIDERANDO: 'Que a pesar de la ardua tarea realizada por el personal del Área de Informática, así como a la ampliación del horario de ingreso implementado por esta Dirección; a la fecha no han podido resolverse en su totalidad los inconvenientes vinculados al sistema de presentación de los certificados ley en soporte electrónico. Que por tanto y a los fines de evitar perjuicios a los administrados esta Dire","url":"https://jusmendoza.gob.ar/wp-content/uploads/2025/10/Resolucion-Administrativa-RA-N°-03-24-Implementacion-Certificados-en-soporte-papel.pdf","color":"#a5d6a7","x":8.239402770996094,"y":-50.37944030761719,"z":90.57762145996094},{"id":7,"nombre":"Resolución Conjunta 02/2025","tipo":"Resolución Conjunta","anio":"2025.0","tema":"nan","titulo":"Resolución Conjunta N° 02/2025 – Informe de Titularidad Provincial","resumen":"La necesidad de continuar mejorando la eficiencia y simplificando el servicio de publicidad registral a los ciudadanos. Que en la actualidad, cuando el administrado pretende obtener un informe de titularidad sobre inmuebles que comprenda toda la provincia de Mendoza, debe presentar una solicitud en la Dirección de la 1°, 3° y 4° Circunscripción y otra en la Dirección de la 2° Circunscripción.","url":"https://jusmendoza.gob.ar/wp-content/uploads/2025/09/Resolucion-Conjunta-N°-0225-Informe-de-Titularidad-Provincial.pdf","color":"#90caf9","x":12.26611328125,"y":-55.6404914855957,"z":75.29756164550781},{"id":8,"nombre":"Resolución Conjunta 01/2025","tipo":"Resolución Conjunta","anio":"2025.0","tema":"nan","titulo":"Resolución Conjunta N° 01/2025 – Informe Titularidad Negativo","resumen":"El aumento significativo de solicitudes de informes de titularidad para acceder a créditos hipotecarios para vivienda única, de Que, como antecedente, la Resolución de Presidencia Nº36.979 del 4 de noviembre de 2019 dispuso a partir del 5 de noviembre de 2019 la auto consulta unificada de titularidad de inmuebles en los portales de las Direcciones de Registros Públicos y Archivo Judicial de la provincia; de tal forma","url":"https://jusmendoza.gob.ar/wp-content/uploads/2025/08/Resolucion-Conjunta-N°-01-2025-Informe-Titularidad-Negativo.pdf","color":"#90caf9","x":28.7305908203125,"y":-47.72279739379883,"z":81.71531677246094},{"id":9,"nombre":"Acordada 31766","tipo":"Acordada","anio":"nan","tema":"nan","titulo":"Acordada N° 31766 – Comisión Destrucción de Expedientes","resumen":"PODER JUDICIAL MENDOZA SUPREMA CORTE DE JUSTICIA VISTO: La Ley Provincial N' 552 Ley Orgánica de Tribunales, modificada por Ley N' 3.898 y Ley N'  7.662, que regula el procedimiento de destrucción y conservación de expedientes La solicitud de la Directora de Registros Públicos y Archivo Judicial de la 1\" 3' y 49 Circunscripción de optimizar el trabajo de la Oficina de Clasificación de Expedientes y Preservación de Derechos CONSIDERANDO: Que la Acordada N' 9.419, de fecha 10 de marzo de 1978, puso en funcionamiento la Comisión de Destrucción de Expedientes , designando como integrantes al Fisca","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/12/Acordada-N°-31766-Comision-Destruccion-de-Expedientes.pdf","color":"#fff176","x":17.319557189941406,"y":-87.21875762939453,"z":61.890716552734375},{"id":10,"nombre":"Resolución Conjunta 01/2024","tipo":"Resolución Conjunta","anio":"2024.0","tema":"nan","titulo":"Resolución Conjunta N° 01/2024 – Infraestructura de Datos Espaciales de Mendoza","resumen":"La utilidad e importancia de contribuir al desarrollo de la Infraestructura de Datos Espaciales de Mendoza, existente en la Subsecretaría de Infraestructura y Desarrollo Territorial de la Provincia de Mendoza, y Que las Direcciones de Registros Públicos comparten con la Subsecretaría, el objetivo de promover el uso de una base geográfica común de la Provincia, mediante la incorporación progresiva de información geoespacial y","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/11/Resolucion-Conjunta-N°-01-2024-Infraestructura-de-Datos-Espaciales-de-Mendoza.pdf","color":"#90caf9","x":10.366378784179688,"y":-48.374141693115234,"z":70.4197998046875},{"id":11,"nombre":"Ley 17801","tipo":"Ley","anio":"nan","tema":"nan","titulo":"Ley N° 17801 – Régimen Nacional Registral","resumen":"En uso de las atribuciones conferidas por el artículo 5º del Estatuto de la Revolución Argentina, El Presidente de la Nación Argentina Sanciona y Promulga con fuerza de Ley: Registro de la Propiedad Inmueble. Objeto. Documentos registrales Artículo 1º - Quedarán sujetos al régimen de la presente ley los registros de la propiedad in- mueble existentes en cada provincia y en la CAPITAL FEDERAL. (Artículo sustituido por punto 1.1 del Anexo II de la Ley N° 26.994 B.O. 08/10/2014 Suplemento. Vigencia: 1° de agosto de 2015, texto según","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/Ley-N°-17801-Regimen-Nacional-Registral.pdf","color":"#ce93d8","x":15.677352905273438,"y":-71.93927001953125,"z":62.102752685546875},{"id":12,"nombre":"Ley 8236","tipo":"Ley","anio":"nan","tema":"nan","titulo":"Ley 8236 – Reglamentación Provincial de la Ley 17.801","resumen":"El Senado y Cámara de Diputados de la Provincia de Mendoza, sancionan con Artículo 1º - La presente ley en ejercicio de facultades no delegadas regula el procedimiento para la aplicación de la Ley 17.801 en la Provincia de Mendoza. Artículo 2° - El Registro de la Propiedad Inmueble tomará razón de los documentos públicos de origen notarial, judicial o administrativo, que se refieran a inmuebles ubicados Por los que se constituyan, transmitan, declaren, modifiquen o extingan derechos","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/02/Ley-8236-Reglamentacion-Provincial-de-la-Ley-17.801.pdf","color":"#ce93d8","x":15.687416076660156,"y":-83.18266296386719,"z":59.039642333984375},{"id":13,"nombre":"Ley 6279","tipo":"Ley","anio":"nan","tema":"nan","titulo":"Ley 6279 – Colaboración del Colegio Notarial a los Registros de Propiedad Inmueble","resumen":"El Senado y Cámara de Diputados de la provincia de Mendoza, sancionan con fuerza de  Ley: Artículo 1º - Autorizase al Colegio Notarial de la provincia de Mendoza a prestar colaboración financiera y técnica especializada a los registros de la propiedad inmueble, con el objeto de proveer a su restructuración y el mejoramiento de sus métodos operativos, sobre  bases modernas que permitan su Artículo 2º -  Facultase a la Suprema Corte de Justicia para celebrar con el Colegio Notarial  de la provincia de Mendoza un convenio en el que se concreta dicha cooperación sobre  las bases que establece","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/02/Ley-6279-Colaboracion-del-Colegio-Notarial-a-los-Registros-de-Propiedad-Inmueble.pdf","color":"#ce93d8","x":7.30438232421875,"y":-77.47290802001953,"z":66.42301940917969},{"id":14,"nombre":"Resolución","tipo":"Resolución","anio":"nan","tema":"nan","titulo":"Resolución 166 – Zonas de Frontera","resumen":"Apruébese la Directiva para el Ejercicio de la Policía de Radicación en Zonas de VISTO el Expediente Nº S02:0012801/2008 del registro de este Ministerio, lo establecido por el artículo 75 inciso 16 de la CONSTITUCION NACIONAL, el artículo 4º del Decreto-Ley Nº 15.385 (Ley Nº 12.913), reemplazado por el artículo 42 de la Ley Nº 23.554, las Leyes Nros. 18.575 y 26.338, los Decretos Nros. 1409 y 1410 del 31 de diciembre de 1996, la Resolución Nº 1751 del 22 de noviembre de 1995 del Ministerio de Defensa, las Resoluciones de la ex","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/02/Resolucion-166-2009-Zonas-de-Fronteras.pdf","color":"#ff8a65","x":7.30230712890625,"y":-93.52926635742188,"z":60.58673095703125},{"id":15,"nombre":"Decreto 2018/2018","tipo":"Decreto","anio":"2018.0","tema":"nan","titulo":"Decreto 253 – 2018 – Zona de Seguridad de Frontera","resumen":"Zonas de Seguridad de Fronteras. Apruébase Cartografía Oficial. Facultades. VISTO el Expediente N° EX-2017-14774841-APN-SECF#MSG, el Decreto-Ley Nº 15.385 del 13 de junio de 1944 y su modificatoria, la Ley Nº 18.575, los Decretos Nros. 887 del 6 de junio de 1994 y su modificatorio, 1648 del 15 de noviembre de 2007, 13 del 10 de diciembre de 2015, 15 del 5 de enero de 2016, 27 del 9 de enero de 2017 y 174 del 2 de marzo de 2018 y Que el Decreto-Ley Nº 15.385/44 y su modificatoria, crea la Zona de Seguridad de Fronteras","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/02/Decreto-253-2018-Zona-de-Seguridad-de-Frontera.pdf","color":"#f48fb1","x":2.8203506469726562,"y":-100.0,"z":55.11128234863281},{"id":16,"nombre":"Plano 2018/2018","tipo":"Plano","anio":"2018.0","tema":"nan","titulo":"Plano de Mendoza. Modificación 2018","resumen":"ZONA DE SEGURIDAD DE FRONTERAS Y ÁREAS DE DESARROLLO DE FRONTERA MENDOZA KGN REPÚBLICA ARGENTINA inst 'HecGecicanargliiona Ministerio de Defensa Presidencia de la Nación ONSULTA EuGENIO S-N CARLOS Bustos \"ELcukioo asco Fauo referencias CARtoGrAficAS Pannn Viiiliageklunnlank  Pann 90071 onamanl MENDOZA GENERAL ALVEAR RODEO DEL MEDIO SANTA ROSA NIHUIV \"enieDLRCA Pern anoonaxtanla< Podiacon 06 2 005 5oohatant€ Pacin Juunmlanig€","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/02/Plano-de-Mendoza.-Modificacion-2018.pdf","color":"#bcaaa4","x":8.865509033203125,"y":-99.56029510498047,"z":57.255157470703125},{"id":17,"nombre":"Decreto 283","tipo":"Decreto","anio":"nan","tema":"nan","titulo":"Anexo 1 – Decreto 283. Zona frontera desarrollo y seguridad","resumen":"A. ZONA DE FRONTERA PARA EL DESARROLLO Y ZONA DE SEGURIDAD I. Provincias de Entre Ríos, Corrientes y Misiones En la Provincia de Entre Ríos, remontando el Río Paraná Guazú desde su desembocadura hasta la Ruta Nacional 12 y por la misma hasta su encuentro con la Ruta Nacional 14. Por esta última hasta la intersección de la Ruta Nacional 14 y la Ruta Provincial 144 en CORRIENTES y desde este punto, en línea recta, hasta","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/02/Anexo-1.-Decreto-283.-Zona-frontera-desarrollo-y-seguridad.pdf","color":"#f48fb1","x":-0.054840087890625,"y":-87.67542266845703,"z":56.40751647949219},{"id":18,"nombre":"Decreto 253","tipo":"Decreto","anio":"nan","tema":"nan","titulo":"Anexo 2 – Decreto 253 – Denominación y descripción de areas","resumen":"A. ZONA DE FRONTERA PARA EL DESARROLLO Y ZONA DE SEGURIDAD I. Provincias de Entre Ríos, Corrientes y Misiones En la Provincia de Entre Ríos, remontando el Río Paraná Guazú desde su desembocadura hasta la Ruta Nacional 12 y por la misma hasta su encuentro con la Ruta Nacional 14. Por esta última hasta la intersección de la Ruta Nacional 14 y la Ruta Provincial 144 en CORRIENTES y desde este punto, en línea recta, hasta","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/02/Anexo-2.-Decreto-253.-Denominacion-y-descripcion-de-areas.pdf","color":"#f48fb1","x":4.206535339355469,"y":-80.2113037109375,"z":56.88975524902344},{"id":19,"nombre":"DTR","tipo":"DTR","anio":"nan","tema":"nan","titulo":"Ver DTR N ° 4","resumen":"DISPOSICIÓN TÉCNICO REGISTRAL CONJUNTA N O 4 La necesidad de reglamentar el procedimiento de las solicitudes de reinscripción de medidas cautelares e hipotecas, de prórroga de las inscripciones provisionales y de prórroga de devoluciones con reserva de prioridad. Que en relación a las inscripciones provisionales, el art. 9 de la ley 17.801 establece que se practicarán por el plazo de ciento ochenta","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/02/Disposicion-tecnico-registral-conjunta-N°-4.pdf","color":"#ffb74d","x":29.235977172851562,"y":16.709983825683594,"z":53.961151123046875},{"id":20,"nombre":"DTR 3","tipo":"DTR","anio":"nan","tema":"nan","titulo":"Ver DTR N° 3","resumen":"DIRECCION DE REGISTROS PUBLICOS Y ARCHIVO JUDICIAL Poder Judicial Mendoza DISPOSICIÓN TÉCNICO REGISTRAL CONJUNTA No 1 (VIR fe de Drratas es N'3) El artículo 24 de la Ley 27.271 de Sistema de Ahorro para el Fomento de la Inversión en Vivienda; que reemplaza el artículo 2.210 del Código Civil y Comercial de la Nación y, CONSIDERANDO: Que dicho artículo reemplaza el artículo 2.210 del CCCN, ampliando los efectos de la inscripción de la hipoteca a treinta y cinco (35) años. Que el artículo 7 de dicho Código establece que las leyes no son retroactivas sean 0 no de orden público; excepto disposición","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/hipoteca-dtr-3.pdf","color":"#ffb74d","x":26.854896545410156,"y":11.448097229003906,"z":54.22322082519531},{"id":21,"nombre":"DTR 1","tipo":"DTR","anio":"nan","tema":"nan","titulo":"Ver DTR N° 1","resumen":"DISPOSICION TECNICO REGISTRAL CONJUNTA N' 01/2014 Lo dispuesto por la Ley N 25.246 Y sus modificatorias Ley N 26.734, Decreto Reglamentario N' 290/7, Decreto N'1936/10, Y las Resoluciones N' 41/2011, N? 70/2011,y N? 3/2014 de la Unidad de Información Financiera (UIF); Y Que en virtud de lo establecido en el artículo de la Ley 25.246 y sus modificatorias, la Unidad de Información Financiera (UIF) es el organismo encargado del análisis, tratamiento Y transmisión de información a los efectos de prevenir impedir los delitos de Lavado de Activos (artículo 303 del Código Penal) de Financiación del T","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/uif-dtr-1-1.pdf","color":"#ffb74d","x":26.70427703857422,"y":15.886177062988281,"z":46.56974792480469},{"id":22,"nombre":"DTR 2","tipo":"DTR","anio":"nan","tema":"nan","titulo":"Ver DTR N° 2","resumen":"DISPOSICION TECNICO REGISTRAL CONJUNTA N? 02/2014 Lo dispuesto por la Ley N' 25.246 Y sus modificatorias Ley N' 26.734, Decreto Reglamentario N' 290/7, Decreto N*1936/10, Y las Resoluciones N' 41/2011, N' 70/011,y N' 3/2014 de la Unidad de Información Financiera (UIF); Y Que la Disposición Técnico Registral Conjunta N' 1 dispone en su punto 3 que: \"La presentación, tanto de la Declaración Jurada como de la Constancia de Inscripción ante la Unidad de Información Financiera, se tendrán por válidas Y vigentes hasta tanto el presentante no exteriorice mediante otra declaración del mismo tenor; que","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/02/Disposicion-tecnico-registral-conjunta-N°-2.pdf","color":"#ffb74d","x":20.367027282714844,"y":2.6441574096679688,"z":52.56425476074219},{"id":23,"nombre":"DTR 5","tipo":"DTR","anio":"nan","tema":"nan","titulo":"Ver DTR N° 5","resumen":"\u0012\u0005\t\u0002\u0013\u0014\u0007\f\u000f\u0002\u0015\u000e\u0004\u0005\t\u0016\u0005\r\t\u0002\u000f\t\u0007\r\u0014\u0017\t\u0010\u000b\t\u0004\u0002\t\u000f\u0007\t\u000f\u0002\u0018\t\u0010\u0019\u0010\u001a\u001b\t\u0018\t\u000f\u0007\t\u001c\u0002\u0013\u0005\u000f\u001d\u0015\u000e\u001e\u0003 \u0004\u0002\t\u000f\u0007\t\"\u0003\u000e\u0004\u0007\u0004\t\u0004\u0002\t#\u0003$\u0005\r%\u0007\u0015\u000e\u001e\u0003\t&\u000e\u0003\u0007\u0003\u0015\u000e\u0002\r\u0007\t\u0018\b '\u001d\u0002\t\u0002\u000f\t\u001c\u0002(\u000e\u0013\u0014\r\u0005\t#\u0003%\u0005\f\u000e\u000f\u000e\u0007\r\u000e\u0005\t\r\u0002)\u000e\u0013\u0014\u0002\t\u0002\u000f\t\u0015\u0007\r*\u0015\u0014\u0002\r\t\u0004\u0002\t\u0013\u001d+\u0002\u0014\u0005 \u0005\f\u000f\u000e(\u0007\u0004\u0005\t\u0002\u0003\t\u000f\u0005\u0013\t\u0014,\r%\u000e\u0003\u0005\u0013\t\u0004\u0002\u000f\t-\r\u0014\u0017\t\u0010\u000b\b\t\u000e\u0003\u0015\u0017\t\u001b\b\t\u0004\u0002\t\u000f\u0007\t\u000f\u0002\u0018\t\u0010\u0019\u0010\u001a\u001b\b\t\u0002\u0003\u0015\u0005\u0003\u0014\r*\u0003\u0004\u0005\u0013\u0002\t\u0007\u000f\u0015\u0007\u0003\u0006\u0007\u0004\u0005\t\u0016\u0005 \u0002\u000f\t\u0004\u0002\f\u0002\r\t\u0004\u0002\t\u000e\u0003$\u0005\r%\u0007\r\t\u0002\u0013\u0014\u0007\f\u000f\u0002\u0015\u000e\u0004\u0005\t\u0002\u0003\t\u0002\u000f\t\u0007\r\u0014\u0017\t\u0010 #\u0003$\u0005\r%\u0007\u0015\u000e\u001e\u0003\t&\u000e\u0003\u0007\u0003\u0015\u000e\u0002\r\u0007\t\r\u0002/\u001d\u000e\u0002\r\u0002\t/\u001d\u0002\t\u000f\u0005\u0013\t\u0013\u001d+\u0002\u0014\u0005\u0013\t\u0005\f\u000f\u000e(\u0007\u0004\u0005\u0013\t\u0002\u0003\u001d%\u0002\r\u0007\u0004\u0005\u0013\t\u0002\u0003\t\u000f\u0005\u0013\t\u000e\u0003\u0015\u000e\u0013\u0005\u0013\t\u001b\t\u0018","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/02/Disposicion-tecnico-registral-conjunta-N°-5.pdf","color":"#ffb74d","x":21.750030517578125,"y":17.082748413085938,"z":46.040283203125},{"id":24,"nombre":"OSC 396 Anexo VII","tipo":"OSC","anio":"nan","tema":"nan","titulo":"Ver OSC N° 396 Anexo VII","resumen":"Dirección de Registros Públicos y Archivo Judicial 1%, 30 y 4\" C.J DRP Poder Judicial Mendoza ANEXO N' SIETE (7) Accesoriedad. ORDEN DE SERVICIO N? 396 CONSIDERANDO: Que la   posición jurídica respecto al principio de ACCESORIEDAD vertida en el C.C.CN y la interpretación que se hace de dicho principio; concluye que la cosa accesoria (Ilámese accesoria propiamente dicha como así también la perteneciente a la Unidad Fun- cional de P.H.), es la que en un todo inmobiliario 0 mobiliario coadyuva al servicio económi- co-jurídico al cual está destinado el conjunto; encontrándose en una relación de su","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/03/Accesoriedad-Orden-de-Servicio-N%C2%B0-396-Anexo-VII.pdf","color":"#4fc3f7","x":-78.26429748535156,"y":-48.98794937133789,"z":-97.53136444091797},{"id":25,"nombre":"OSC 9-25","tipo":"OSC","anio":"nan","tema":"nan","titulo":"Ver OSC N° 9-25","resumen":"PODER JUDICIAL MENDOZA SUPREMA CORTE DE JUSTICIA DIRECCION DE REGISTROS PÚBLICOS Y ARCHIVO JUDICIAL y 4* (RC:UNSCRIPEJNWN }U0i6:4/ ADECUACION PH ESPECIAL-NO SE CALIFICA INHIBICIÓN El ingreso de escrituras públicas de adecuación al Régimen de PH Especial en los que alguno algunos de los otorgantes se encuentra afectado por la medida de inhibición general de bienes; en virtud de la cual no pueden ser inscriptas en forma definitiva por aplicación del artículo 127 del Código de Procedimientos Civil y Comercial de Mendoza Que la inscripción provisional se funda en el ejercicio de la función adminis","url":"https://jusmendoza.gob.ar/wp-content/uploads/2025/02/O.S.C.9-25.pdf","color":"#4fc3f7","x":-100.0,"y":90.76535034179688,"z":-87.93311309814453},{"id":26,"nombre":"OSC 8-24","tipo":"OSC","anio":"nan","tema":"nan","titulo":"Ver OSC N° 8-24","resumen":"PODER JUDICIAL MENDOZA SUPREMA CORTE DE JUSTICIA DIRECCIÓN DF REGISTROS PÚBLICOS Y ARCHIVO JUDICIAL 3\" y CIRCUNSCRIP(N JUnica). O.S.C N'8-24 CALIFICACION DECOMISO-EXTINCION DE DOMINIO VISTO: la necesidad de determinar la calificación registral' que corres- ponde en los casos de decomiso y extinción de dominio_ Que el artículo 2 inciso c de la ley 17.801 dispone que son documentos registrables: 'los dispuestos por otras leyes nacionales 0 provinciales\"_ Que la ley 26.683 promulgada parcialmente el 17/06/2011 reformó el art. 23 Código Penal' modificando la figura del decomiso. Que el art. 2' del","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/08/O.S.C.-08-24.pdf","color":"#4fc3f7","x":-78.83221435546875,"y":69.1927490234375,"z":-100.0},{"id":27,"nombre":"OSC 04-24","tipo":"OSC","anio":"nan","tema":"nan","titulo":"Ver OSC N° 04-24","resumen":"PODER JUDICIAL MENDOZA SUPREMA CORTE DE JUSTICIA DIRFCCIÓN DF RFGISTROS PÚBLICOS Y ARCHIVO TUDICIAL 1C 'UNS( RJc'6X ICDIsL.L ORDEN DE SERVICIO CALIFICACIÓNYREGISTRACION:OS-C-4-24 INCORPORACIÓN DE BIENES DEL DOMINIO PÚBLICO DEL ESTADO A LA BASE DE TITULARES Que el artículo 10 de la ley 17801 establece la matriculación de todos los inmuebles respecto de los cuales deben inscribirse 0 anotarse los docu- mentos a los que se refiere el artículo 2, exceptuándose los inmuebles del dominio público. CONSIDERANDO: Que en aplicación de dicha norma; la Dirección de Registros Públicos y Archivo Judicial de","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/08/Dominio-publico-del-estado-a-la-base-de-los-titulares-O.S.C-4-24.pdf","color":"#4fc3f7","x":-64.51512908935547,"y":70.48597717285156,"z":-95.74800872802734},{"id":28,"nombre":"OSC 2-24","tipo":"OSC","anio":"nan","tema":"nan","titulo":"Ver OSC N° 2-24","resumen":"PODER JUDICIAL MENDOZA SUPREMA CORTE DE JUSTICIA D)JRTCCION TF RFG,[S k()s PÚBucos ARCHTTO UL)(a[ 4 Fb 1482 [ie O.S.CN'2-24 CALIFICACION REGISTRAL FIDEICOMISO VISTO: la necesidad de determinar la calificación registral en algunos supuestos relativos a las transferencias de dominio 0 a las medidas cautelares vin- culadas al contrato de fideicomiso CONSIDERANDO: Que el CCCN establece la obligatoriedad de la inscripción del contrato de fideicomiso; la cual no se encuentra reglamentada en la provincia de Mendoza, no existiendo en la actualidad un Registro de contratos de fideicomiso. Que dentro de","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/fideicomiso-OS-C-2-24.pdf","color":"#4fc3f7","x":-76.02406311035156,"y":80.34033203125,"z":-99.89743041992188},{"id":29,"nombre":"OSC 10-25","tipo":"OSC","anio":"nan","tema":"nan","titulo":"Ver OSC N° 10-25","resumen":"PODER JUDICIAL MENDOZA SUPREMA CORTE DE JUSTICIA DIRECCIÓN DF REGISTROS PÚBLIOS Y ARCIIIVO TUDICLAL GRF(NS: IWP<[o?n JWiC. O.SCN' 10/25 MODIFICACIÓN O.S.C N' 2-24 CALIFICACION REGISTRAL FIDEICOMISO La necesidad de introducir modificaciones a la Orden de Servicio de Calificación N' 2/24 referida a la calificación registral del fideicomiso_ Que las causales de cese del fiduciario establecidas por el artículo 1678 del CCCN se consideran una enumeración enunciativa, permitiendo que las partes pacten otras causales. Que, en virtud del principio de autonomía de la voluntad, el fidu- ciante puede res","url":"https://jusmendoza.gob.ar/wp-content/uploads/2025/02/O.S.C.10-25.pdf","color":"#4fc3f7","x":-85.63460540771484,"y":97.25331115722656,"z":-89.89601135253906},{"id":30,"nombre":"OSC 396 Anexo IV","tipo":"OSC","anio":"nan","tema":"nan","titulo":"Ver OSC N° 396 Anexo IV","resumen":"Dirección de Registros Públicos y Archivo Judicial 1%, 30 y 4\" C.J DRP Poder Judicial Mendoza ANEXO N' SIETE (7) Accesoriedad. ORDEN DE SERVICIO N? 396 CONSIDERANDO: Que la   posición jurídica respecto al principio de ACCESORIEDAD vertida en el C.C.CN y la interpretación que se hace de dicho principio; concluye que la cosa accesoria (Ilámese accesoria propiamente dicha como así también la perteneciente a la Unidad Fun- cional de P.H.), es la que en un todo inmobiliario 0 mobiliario coadyuva al servicio económi- co-jurídico al cual está destinado el conjunto; encontrándose en una relación de su","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/hipoteca-os-396-anexo-IV.pdf","color":"#4fc3f7","x":-77.75714874267578,"y":-55.65272521972656,"z":-95.89392852783203},{"id":32,"nombre":"OSC 576","tipo":"OSC","anio":"nan","tema":"nan","titulo":"Ver OSC N° 576","resumen":"PODER JUDICIAL MENDOZA SUPREMA CORTE DE JUSTICIA DIRECCIÓN DE REGISTROS PÚBLICOS Y ARCHIVO JUDICIAL 1*, 3' Y 4* CIRCUNSCRIPCION JUDICIAL ORDEN DE SERVICIO N 576 INSCRIPCIÓN Y PUBLICIDAD IDENTIDAD DE GENERO VISTO: Lo dispuesto por la ley 26743 \"Ley de identidad de CONSIDERANDO: Que toda persona podrá solicitar; ante el Registro Na- cional de las Personas, la rectificación registral del cambio de nombre de pila cuando no coincida con su identidad autopercibida (art.3). Que la rectificación del nombre de pila se realizará conservándose el número de documento nacional de identidad original (art. 4","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/02/Orden-de-Servicio-N°-576.pdf","color":"#4fc3f7","x":-72.06314086914062,"y":-15.851875305175781,"z":-95.35908508300781},{"id":33,"nombre":"DTR 4","tipo":"DTR","anio":"nan","tema":"nan","titulo":"Ver DTR N° 4","resumen":"DISPOSICIÓN TÉCNICO REGISTRAL CONJUNTA N O 4 La necesidad de reglamentar el procedimiento de las solicitudes de reinscripción de medidas cautelares e hipotecas, de prórroga de las inscripciones provisionales y de prórroga de devoluciones con reserva de prioridad. Que en relación a las inscripciones provisionales, el art. 9 de la ley 17.801 establece que se practicarán por el plazo de ciento ochenta","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/02/Disposicion-tecnico-registral-conjunta-N°-4.pdf","color":"#ffb74d","x":35.46089172363281,"y":10.47418212890625,"z":59.64060974121094},{"id":34,"nombre":"OSC 396 Anexo II","tipo":"OSC","anio":"nan","tema":"nan","titulo":"Ver OSC N° 396 Anexo II","resumen":"Dirección de Registros Públicos y Archivo Judicial 1%, 30 y 4\" C.J DRP Poder Judicial Mendoza ANEXO N' SIETE (7) Accesoriedad. ORDEN DE SERVICIO N? 396 CONSIDERANDO: Que la   posición jurídica respecto al principio de ACCESORIEDAD vertida en el C.C.CN y la interpretación que se hace de dicho principio; concluye que la cosa accesoria (Ilámese accesoria propiamente dicha como así también la perteneciente a la Unidad Fun- cional de P.H.), es la que en un todo inmobiliario 0 mobiliario coadyuva al servicio económi- co-jurídico al cual está destinado el conjunto; encontrándose en una relación de su","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/mandatos-os-396-anexo-II.pdf","color":"#4fc3f7","x":-83.57521057128906,"y":-63.89193344116211,"z":-94.98200225830078},{"id":35,"nombre":"OSA 87-","tipo":"OSA","anio":"nan","tema":"nan","titulo":"Ver OSA N° 87- 25","resumen":"PODER JUDICIAL MENDOZA SUPREMA CORTE DE JUSTICIA DIRECCION DE REGISTROS PÚBLICOS Y ARCHIVO JUDICIAL CIRCUNSCRIPCIÓN [UDECIAL VISTO: El proceso de modernización-que viene llevando adelante la DRP efectos de brindar un servicio expeditivo y certero. CONSIDERANDO: Que en el marco de ese proceso, es intención de este Registro   la migración del sistema SIRC 2.0 a SAYGES . Que en ese sentido; el Área de Informática Registral ha elaborado un plan de acción por el cual se desarrollarán; en diferentes módulos; la implementación de este cambio propuesto_ Que el Área de Mandatos fue designada para conti","url":"https://jusmendoza.gob.ar/wp-content/uploads/2025/08/O.S.A.87-25.pdf","color":"#81c784","x":-68.90679931640625,"y":52.98597717285156,"z":-78.61942291259766},{"id":36,"nombre":"OSC 14-25","tipo":"OSC","anio":"nan","tema":"nan","titulo":"Ver OSC N° 14-25","resumen":"PODER JUDICIAL MENDOZA SUPREMA CORTE DE JUSTICIA DIRECCIÓN DE REGISTROS PÚBIJCOS Y ARCHIVO JUDJCIAL Qaseripoann Jltvcial @SC NRO: 14-25.- CALIFICACION REGISTRALMANDATOS La implementación del nuevo proceso de inscripción de mandatos y la consecuente necesidad de establecer pautas de calificación registral de poderes y asentimientos _ Que; en el Registro de Mandatos; se inscribe todo instrumento público 0 privado que atribuya a una persona la facultad de representar a otro para la realización de ciertos actos jurídicos; y los que contienen asentimiento del cónyuge 0 del conviviente; como así tam","url":"https://jusmendoza.gob.ar/wp-content/uploads/2025/10/OSC-N°-14-25.pdf","color":"#4fc3f7","x":-84.80644989013672,"y":100.0,"z":-87.85591125488281},{"id":37,"nombre":"OSA 100","tipo":"OSA","anio":"nan","tema":"nan","titulo":"Ver OSA N° 100 – 25","resumen":"PODER JUDICIAL MENDOZA SUPREMA CORTE DE JUSTICIA DIRECCION DE REGISTROS PÚBLICOS Y ARCHIVO JUD[CIAL \" 4(IRCENS(klp,l(N JElO'ia) OSA NRO 100/25 IMPLEMENTACIÓN MÓDULO PODERES SAYGES- MODIFICACIÓN OSA 87/25 El proceso de modernización que viene llevando adelante la DRP a efectos de brindar un servicio expeditivo y certero. CONSIDERANDO: Que mediate la OSA 87-25 se dispuso la implementación del nuevo sistema de Mandatos en la plataforma SAYGES el que se encuentra en la actualidad en funcionamiento . Que en la misma se fijó como plazo de coexistencia de amnbos sistemas hasta el día 13 de Octubre de","url":"https://jusmendoza.gob.ar/wp-content/uploads/2025/10/O.S.A.100-25.pdf","color":"#81c784","x":-69.27845764160156,"y":73.79029846191406,"z":-78.726318359375},{"id":38,"nombre":"OSC 333","tipo":"OSC","anio":"nan","tema":"nan","titulo":"Ver OSC N° 333","resumen":"DIRECCIÓN DE REGISTROS PÚBLICOS Y ARCHIVO JUDICIAL 19,30 y 40 CJ. PODER JUDICIAL MENDOZA VISTO; La necesidad de reglamentar la forma de inscripción de las anotaciones de Litis atento sus especiales características. CONSIDERANDQ: Que de conformidad con lo establecido por el art. 123 del CPC, lo anotación de Litis procede cuando se promueve demanda sobre el dominio de bienes inmuebles sobre constitución, declaración, modificación extinción de cualquier derecho real 0 se ejercieren acciones vinculadas a bienes inmuebles y la sentencia haya de ser opuesta terceros Que el art: 90 de la ley 8236 est","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/medidas-cautelares-os-333.pdf","color":"#4fc3f7","x":-72.90485382080078,"y":32.66789245605469,"z":-92.1600570678711},{"id":39,"nombre":"OSC 402","tipo":"OSC","anio":"nan","tema":"nan","titulo":"Ver OSC N° 402","resumen":"ORDEN DE SERVICIO NRO{2_MODIFICATORIA DE_LA ORDEN DE SERVICIO NRO 333. Mendoza,23de Noviembre del 2015. VISTO: la resolución recaída en el expediente nro. R 7/15. CONSIDERANDO: Que de conformidad con lo establecido por el art. 123 del CPC, Ja anotación de Litis procede cuando se promueve demanda sobre el dominio de bienes inmuebles sobre constitución, declaración; modificación 0 extinción de cualquier derecho real 0 se ejercieren acciones vinculadas bienes inmuebles y la sentencia haya de ser opuesta a terceros Que el art. 90 de la ley 8236 establece que en el supuesto de este tipo de medidas;","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/02/Orden-de-Servicio-N°-402.pdf","color":"#4fc3f7","x":-64.61257934570312,"y":26.508644104003906,"z":-90.66435241699219},{"id":40,"nombre":"OSC 396 Anexo VI","tipo":"OSC","anio":"nan","tema":"nan","titulo":"Ver OSC N° 396 Anexo VI","resumen":"Dirección de Registros Públicos y Archivo Judicial 1%, 30 y 4\" C.J DRP Poder Judicial Mendoza ANEXO N' SIETE (7) Accesoriedad. ORDEN DE SERVICIO N? 396 CONSIDERANDO: Que la   posición jurídica respecto al principio de ACCESORIEDAD vertida en el C.C.CN y la interpretación que se hace de dicho principio; concluye que la cosa accesoria (Ilámese accesoria propiamente dicha como así también la perteneciente a la Unidad Fun- cional de P.H.), es la que en un todo inmobiliario 0 mobiliario coadyuva al servicio económi- co-jurídico al cual está destinado el conjunto; encontrándose en una relación de su","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/medidas-cautelares-os-396-anexo-VI.pdf","color":"#4fc3f7","x":-78.09466552734375,"y":-45.64258575439453,"z":-91.24394226074219},{"id":41,"nombre":"OSC 16-25","tipo":"OSC","anio":"nan","tema":"nan","titulo":"Ver OSC N° 16-25","resumen":"PODER JUDICIAL MENDOZA SUPREMA CORTE DE JUSTICIA DIRECCIÓN DE KEGISTROS PCBLICOS Y ARCHIVO JUDICIAL 14 (R68st#lvt JhA' /1:/* 781 ORDEN DE SERVICIO DE CALIFICACIÓN NRO: 16/25 CALIFICACIÓN_REGISTRAL_DE_MODIFICACIÓN DE REGLAMENTO_DE COPROPIEDAD YADMINISTRACIÓN La necesidad de determinar la calificación registral en los supuestos relativos a las Modificaciones de Reglamentos de Copropiedad y Administración de Propiedad Horizontal y Propiedad Horizontal Especial presentados para su inscripción. Las  interpretaciones   que existen en relación a   las  facultades   que posee el Administrador del Cons","url":"https://jusmendoza.gob.ar/wp-content/uploads/2025/12/O.S.C.16-25.pdf","color":"#4fc3f7","x":-86.02485656738281,"y":86.64173889160156,"z":-82.28709411621094},{"id":42,"nombre":"OSC 17-25","tipo":"OSC","anio":"nan","tema":"nan","titulo":"Ver OSC N° 17-25","resumen":"PODER JUDICIAL MENDOZA SUPREMA CORTE DE JUSTICIA DIRECCIÓN DE REGISTROS PUBLICOS Y ARCIVO JUDICIA[ (Rt Unse Reee:o'y JDig,i ORDEN DE SERVICIO DE CALIFICACIÓN NRO 17/25 Divorcio. Particiones extrajudiciales: no exigencia de aportes caja forense y conformidades profesionales Que, como consecuencia de la   resolución de   la Sala  Administrativa de la Suprema Corte de Justicia de Mendoza dictada en los autos nro. 12174 caratulados \"Caja de Jubilaciones Pensiones de Abogados Procuradores de Mendoza Gobierno de la Provincia de Mendoza (Poder Judicial) s APA referida a la aplicación del artículo 47 ","url":"https://jusmendoza.gob.ar/wp-content/uploads/2025/12/O.S.C.17-25.pdf","color":"#4fc3f7","x":-87.68353271484375,"y":80.36033630371094,"z":-80.73947143554688},{"id":43,"nombre":"OSC 13-25","tipo":"OSC","anio":"nan","tema":"nan","titulo":"Ver OSC N° 13-25","resumen":"PODER JUDICIAL MENDOZA SUPREMA CORTE DE JUSTICIA DIRECCIÓN DE REGISTROS PÚBLICOS Y ARCHIVO JUDICIAL 18\" 4\"(IRCCNS(RIPCIOA' IETIo-l.il OS-C-NRQ.13-2025 MODIFICACIÓN DE OS-C-NRO.07-2024 PUBLICIDAD CARTULAR TITULOS NOTARIALES, JUDICIALES Y ADMINISTRATIVOS - ART. 28 LEY 17801 Y ART 33 LEY 8236. La necesidad de modificar la OS-C-NRO.07-2024 referida a la publicidad de cartular en los títulos notariales; judiciales y administrativos; de conformidad al art. 28 Ley 17801 y art. 33 Ley 8236. CONSIDERANDO: Que la publicidad cartular regulada por los artículos 28 de la ley 17801 y 33 de la ley 8236 no es","url":"https://jusmendoza.gob.ar/wp-content/uploads/2025/08/Publicidad-Cartular-OSC-13-25.pdf","color":"#4fc3f7","x":-91.68228149414062,"y":73.45533752441406,"z":-87.23918151855469},{"id":44,"nombre":"OSC 19-26","tipo":"OSC","anio":"nan","tema":"nan","titulo":"Ver OSC N° 19-26","resumen":"PODER JUDICIAL MENDOZA SUPREMA CORTE DE JUSTICIA DIRECCIÓN DE REGISTROS PÚBLICOS Y ARCHTVO JUDICIAI 11 CIRCUNSERICN JUDICIAL QRDEN DE SERVICIO DE CALIFICACIÓN NRO 19/26 MODIEICACIÓN DE OS-C-NRO.07-2024 PUBLICIDAD CARTULAR IITULOS NOIARIALES_JUDICIALES Y ADMINISTRATIVOS-ARI 28 LEY 17801 YART 33 LEY 8236 QS_VIVIENDA: Que la OS-C-NRO.07-2024 estableció como forma de publicidad cartular la entrega de la copia de la matrícula en la que conste el asiento de exteriorización Que se dispuso además la nota que debía insertarse en el testimonio de la que no surge el tipo de inscripción que ha sido practi","url":"https://jusmendoza.gob.ar/wp-content/uploads/2026/06/O.S.C.19-26.pdf","color":"#4fc3f7","x":-79.5605239868164,"y":64.48979187011719,"z":-85.22900390625},{"id":45,"nombre":"OSC 01-23","tipo":"OSC","anio":"nan","tema":"nan","titulo":"Ver PHE OSC N° 01-23","resumen":"PODER JUDICIAL MENDOZA SUPREMA CORTE DE JUSTICIA [)IKFCCI(v D\": RFGISTRUS PÚBLICUS Y ARCHIFQ WUDICIAL 41i0i82n 8a{ La   problemática que presenta la rúbrica de los libros de Consorcios de Propiedad Horizontal y Propiedad Horizontal Especial. Comercial de la Nación receptó los derechos Reales de Propiedad Horizontal y Propiedad Horizontal Especial y los reguló en forma autónoma incorporando la doctrina Y la jurisprudencia mayoritaria en la materia al momento de su sanción- Que el artículo 2067 prevé en su inciso que el administrador tiene la obligación legal de llevar en forma los libros Y real","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/rubrica-libros-os-c-01-2023.pdf","color":"#4fc3f7","x":-62.35690689086914,"y":83.37446594238281,"z":-92.12474822998047},{"id":46,"nombre":"OSC 396 Anexo VIII","tipo":"OSC","anio":"nan","tema":"nan","titulo":"OSC N° 396 Anexo VIII","resumen":"Dirección de Registros Públicos y Archivo Judicial 1%, 30 y 4\" C.J DRP Poder Judicial Mendoza ANEXO N' SIETE (7) Accesoriedad. ORDEN DE SERVICIO N? 396 CONSIDERANDO: Que la   posición jurídica respecto al principio de ACCESORIEDAD vertida en el C.C.CN y la interpretación que se hace de dicho principio; concluye que la cosa accesoria (Ilámese accesoria propiamente dicha como así también la perteneciente a la Unidad Fun- cional de P.H.), es la que en un todo inmobiliario 0 mobiliario coadyuva al servicio económi- co-jurídico al cual está destinado el conjunto; encontrándose en una relación de su","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/segundo-testimonio-os-396-anexo-VIII.pdf","color":"#4fc3f7","x":-93.18988800048828,"y":-48.01279830932617,"z":-96.38299560546875},{"id":47,"nombre":"OSC 577","tipo":"OSC","anio":"nan","tema":"nan","titulo":"Ver OSC N° 577","resumen":"PODER JUDICIAL MENDOZA SUPREMA CORTE DE JUSTICIA DIRECCIÓN DE REGISTROS PÚBLICOS Y ARCHIVO JUDICIAL 3*y 4* CIRCUNSCRIPCION JUDICIAZ ORDEN DE SERVICIO N 577 SERVIDUMBRES ADMINISTRATIVAS VISTO: la necesidad de reglamentar los  requisitos necesarios para la registración de las servidumbres administrativas en la Direc- ción de Registros Públicos y Archivo Judicial de Mendoza CONSIDERANDO: Que cada tipo de servidumbre posee una regulación legislativa especial; de la que la Dirección de Registros; como órgano administra- tivo no puede apartarse. Por lo expuesto esta Dirección, en uso de las faculta ","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/02/Orden-de-Servicio-N°-577.pdf","color":"#4fc3f7","x":-73.52820587158203,"y":-8.219688415527344,"z":-96.10470581054688},{"id":48,"nombre":"OSC 396 Anexo V","tipo":"OSC","anio":"nan","tema":"nan","titulo":"Ver OSC N° 396 Anexo V","resumen":"Dirección de Registros Públicos y Archivo Judicial 1%, 30 y 4\" C.J DRP Poder Judicial Mendoza ANEXO N' SIETE (7) Accesoriedad. ORDEN DE SERVICIO N? 396 CONSIDERANDO: Que la   posición jurídica respecto al principio de ACCESORIEDAD vertida en el C.C.CN y la interpretación que se hace de dicho principio; concluye que la cosa accesoria (Ilámese accesoria propiamente dicha como así también la perteneciente a la Unidad Fun- cional de P.H.), es la que en un todo inmobiliario 0 mobiliario coadyuva al servicio económi- co-jurídico al cual está destinado el conjunto; encontrándose en una relación de su","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/sinceramiento-fiscal-os-396-anexo-V.pdf","color":"#4fc3f7","x":-82.74748229980469,"y":-60.081443786621094,"z":-97.65542602539062},{"id":49,"nombre":"OSC 488","tipo":"OSC","anio":"nan","tema":"nan","titulo":"Ver OSC N° 488","resumen":"PODER JUDICIAL MENDOZA ORDEN DE SERVICIO NRO 488 VISTO: la cantidad de títulos que se encuentran pendientes de inscripción encuadrados en la ley 27.260 CONSIDERANDO: Que se ha advertido una gran diversidad en los supuestos conteni - dos en los diferentes títulos objeto de calificación Que para una calificación consistente de los mismos y con el fin de contribuir a brindar mayor seguridad jurídica mediante la aplicación de criterios uniformes, resulta ineludible establecer las pautas que se deberán  considerar. Que el art. 38 in fine establece que los bienes declarados deberán figurar a nombre ","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/02/Orden-de-Servicio-N°-488.pdf","color":"#4fc3f7","x":-73.0179443359375,"y":53.25068664550781,"z":-98.78882598876953},{"id":50,"nombre":"OSC 396 Anexo III","tipo":"OSC","anio":"nan","tema":"nan","titulo":"Ver OSC N° 396 Anexo III","resumen":"Dirección de Registros Públicos y Archivo Judicial 1%, 30 y 4\" C.J DRP Poder Judicial Mendoza ANEXO N' SIETE (7) Accesoriedad. ORDEN DE SERVICIO N? 396 CONSIDERANDO: Que la   posición jurídica respecto al principio de ACCESORIEDAD vertida en el C.C.CN y la interpretación que se hace de dicho principio; concluye que la cosa accesoria (Ilámese accesoria propiamente dicha como así también la perteneciente a la Unidad Fun- cional de P.H.), es la que en un todo inmobiliario 0 mobiliario coadyuva al servicio económi- co-jurídico al cual está destinado el conjunto; encontrándose en una relación de su","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/sociedades-os-396-anexo-III.pdf","color":"#4fc3f7","x":-86.64109802246094,"y":-53.61876678466797,"z":-99.41204833984375},{"id":51,"nombre":"OSC 575","tipo":"OSC","anio":"nan","tema":"nan","titulo":"Ver OSC N° 575","resumen":"PODER JUDICIAL MENDOZA SUPREMA CORTE DE JUSTICIA DIRECCIÓN DE REGISTROS PÚBLICOS Y ARCHIVO JUDICIAL 1*, 3\" CIRCUNSCRPCION IUDICIAL ORDEN DE SERVICIO N 575 INSCRIPCIÓN DE PARTICIÓN Y ADJUDICACIÓN SUCESORIA VISTO: Los   supuestos en los que ingresan títulos judiciales y notariales en los que se solicita la inscripción de una adjudicación por partición en un proceso sucesorio. CONSIDERANDO: Que resulta de práctica en este Registro el rechazo de la inscripción en los supuestos en que la misma debe practicarse nombre de una persona fallecida en virtud de no ser sujeto de derecho (art. 19, 22 y 23 d","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/sucesiones-os-575.pdf","color":"#4fc3f7","x":-67.06021881103516,"y":-19.918792724609375,"z":-91.88953399658203},{"id":52,"nombre":"OSC 12-25","tipo":"OSC","anio":"nan","tema":"nan","titulo":"Ver OSC N° 12-25","resumen":"PODER JUDICIAL MENDOZA SUPREMA CORTE DE JUSTICIA DIRECCIÓN DE REGISTROS PÚBLICOS Y ARCHIVO JUDICIAL \"'} CIRCUNS(:RIPEON IUDlca OSC 12/25 AMPLIACIÓN DE SUPUESTOS OS 575- AL CONDÓMINO FALLECIDO EN CASOS DE TRANSFERENCIA DE PARTE INDIVISA SOBRE PARTE DETERMINADA YA OTROS CASOS ANALOGOS La resolución recaída en los Autos N' 100.674 caratulados ALVAREZ VALERIA SILVINA NOTARIA REG No 388 PIRECURSO JERÁRQUICO RESOLUCIÓN REG. PÚBLICO Y ARCHIVO JUD. EN EXPTE. R3/19\" dictada por la Sala Administrativa de la Suprema Corte de Justicia de Mendoza en el marco de un recurso jerárquico interpuesto en contra d","url":"https://jusmendoza.gob.ar/wp-content/uploads/2025/05/Ampliacion-de-presunpuestos-O.S.C.12-25.pdf","color":"#4fc3f7","x":-99.09942626953125,"y":85.96621704101562,"z":-90.11624145507812},{"id":53,"nombre":"OSC 526","tipo":"OSC","anio":"nan","tema":"nan","titulo":"Ver OSC N° 526","resumen":"PODER JUDICIAL MENDOZA SUPREMACORTE DE JUSTICIA DIRECCION DE RFGIsrROS PÚBLIcOS Y ARCHI vo JUDICIAL 3\"yy Cikkunsekion iUii(jal VISTO: El fallo dictado por la Suprema Corte de Justicia de Mendoza en los autos nro.12174 caratulados \"CAJA DE JUBILACIONES Y PENSIONES DE ABOGADOS Y PROCURADORES DE MENDOZA c. GOBIERTO DE LA PROVINCIA DE MENDOZA (PODER JUDICIAL) S. APA CONSIDERANDO: Que en dicho fallo nuestro Superior Tribunal rechaza la demanda interpuesta por la Caja Forense considerando que en el caso concreto no existen razones para justificar la aplicabilidad del at. 47 de la ley 8236 ni en su r","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/tracto-abreviado-os-526.pdf","color":"#4fc3f7","x":-83.25260162353516,"y":-48.859195709228516,"z":-92.25747680664062},{"id":54,"nombre":"OSC 3-24","tipo":"OSC","anio":"nan","tema":"nan","titulo":"Ver OSC N° 3-24","resumen":"PODER JUDICIAL MENDOZA SUPREMA CORTE DE JUSTICIA 11[F:€(:ÓN [JE RI:(;SR()s PÚBLIcOs Y ARCIIVO JUDJCIAL Nei [ 69 \"/:oz '191634,1 VISTO: la necesidad de determinar la calificación registral en relación a la Jey 26737 \"Régimen de Protección al Dominio Nacional sobre la Propiedad, pose- sión 0 tenencia de las Tierras Rurales\" Que el DNU N*70/2023 publicado el 21 de diciembre de 2023, que en- trara en vigencia el 30 de diciembre de 2023 de conformidad al art. 5 del CCCN, en su art.154 dispuso: \"Derógase la Ley N' 26.737\" Que la declaración de inconstitucionalidad del art. 154 del DNU 70/2023 dictad","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/05/tierras-rurales-calificacion-de-tierras-rurales-OS-C-3-24.pdf","color":"#4fc3f7","x":-75.45327758789062,"y":88.35694885253906,"z":-97.25626373291016},{"id":55,"nombre":"OSC 5-24","tipo":"OSC","anio":"nan","tema":"nan","titulo":"Ver OSC N°5-24","resumen":"PODER JUDICIAL MENDOZA SUPREMA CORTE DE JUSTICIA DIRECCIÓN DE; RFGISTROS PÚBLICOS ARChUVU JUDICIA1 . Y '# R(.unsciipcioniuncaal O.S.C. N' 5-24 CALIFICACIÓN DE TIERRAS RURALES La necesidad de determinar la calificación registral en relación a la ley 26.737 \"Régimen de Protección al Dominio Nacional sobre la Propiedad, posesión 0 tenencia de las Tierras Rurales\" CONSIDERANDO: Que el DNU N' 70/2023 publicado el 21 de diciembre de 2023, que entrara en vigencia el 30 de diciembre de 2023 de conformidad al art. 5 del CCCN, en su art. 154 dispuso: \"Derógase la Ley N' 26.737\" Que la declaración de inc","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/06/tierras-rurales-calificacion-de-tierras-rurales-OSC-5-24.pdf","color":"#4fc3f7","x":-85.86956024169922,"y":72.85983276367188,"z":-94.8091812133789},{"id":56,"nombre":"DTR 1 (UIF)","tipo":"DTR","anio":"nan","tema":"nan","titulo":"Ver DTR N° 1","resumen":"DISPOSICION TECNICO REGISTRAL CONJUNTA N' 01/2014 Lo dispuesto por la Ley N 25.246 Y sus modificatorias Ley N 26.734, Decreto Reglamentario N' 290/7, Decreto N'1936/10, Y las Resoluciones N' 41/2011, N? 70/2011,y N? 3/2014 de la Unidad de Información Financiera (UIF); Y Que en virtud de lo establecido en el artículo de la Ley 25.246 y sus modificatorias, la Unidad de Información Financiera (UIF) es el organismo encargado del análisis, tratamiento Y transmisión de información a los efectos de prevenir impedir los delitos de Lavado de Activos (artículo 303 del Código Penal) de Financiación del T","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/uif-dtr-1.pdf","color":"#ffb74d","x":13.495361328125,"y":10.941482543945312,"z":50.772308349609375},{"id":57,"nombre":"DTR 2 (UIF)","tipo":"DTR","anio":"nan","tema":"nan","titulo":"Ver DTR N° 2","resumen":"DISPOSICION TECNICO REGISTRAL CONJUNTA N? 02/2014 Lo dispuesto por la Ley N' 25.246 Y sus modificatorias Ley N' 26.734, Decreto Reglamentario N' 290/7, Decreto N*1936/10, Y las Resoluciones N' 41/2011, N' 70/011,y N' 3/2014 de la Unidad de Información Financiera (UIF); Y Que la Disposición Técnico Registral Conjunta N' 1 dispone en su punto 3 que: \"La presentación, tanto de la Declaración Jurada como de la Constancia de Inscripción ante la Unidad de Información Financiera, se tendrán por válidas Y vigentes hasta tanto el presentante no exteriorice mediante otra declaración del mismo tenor; que","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/uif-dtr-2.pdf","color":"#ffb74d","x":17.740867614746094,"y":12.908134460449219,"z":54.15342712402344},{"id":58,"nombre":"DTR 5 (UIF)","tipo":"DTR","anio":"nan","tema":"nan","titulo":"Ver DTR N° 5","resumen":"\u0012\u0005\t\u0002\u0013\u0014\u0007\f\u000f\u0002\u0015\u000e\u0004\u0005\t\u0016\u0005\r\t\u0002\u000f\t\u0007\r\u0014\u0017\t\u0010\u000b\t\u0004\u0002\t\u000f\u0007\t\u000f\u0002\u0018\t\u0010\u0019\u0010\u001a\u001b\t\u0018\t\u000f\u0007\t\u001c\u0002\u0013\u0005\u000f\u001d\u0015\u000e\u001e\u0003 \u0004\u0002\t\u000f\u0007\t\"\u0003\u000e\u0004\u0007\u0004\t\u0004\u0002\t#\u0003$\u0005\r%\u0007\u0015\u000e\u001e\u0003\t&\u000e\u0003\u0007\u0003\u0015\u000e\u0002\r\u0007\t\u0018\b '\u001d\u0002\t\u0002\u000f\t\u001c\u0002(\u000e\u0013\u0014\r\u0005\t#\u0003%\u0005\f\u000e\u000f\u000e\u0007\r\u000e\u0005\t\r\u0002)\u000e\u0013\u0014\u0002\t\u0002\u000f\t\u0015\u0007\r*\u0015\u0014\u0002\r\t\u0004\u0002\t\u0013\u001d+\u0002\u0014\u0005 \u0005\f\u000f\u000e(\u0007\u0004\u0005\t\u0002\u0003\t\u000f\u0005\u0013\t\u0014,\r%\u000e\u0003\u0005\u0013\t\u0004\u0002\u000f\t-\r\u0014\u0017\t\u0010\u000b\b\t\u000e\u0003\u0015\u0017\t\u001b\b\t\u0004\u0002\t\u000f\u0007\t\u000f\u0002\u0018\t\u0010\u0019\u0010\u001a\u001b\b\t\u0002\u0003\u0015\u0005\u0003\u0014\r*\u0003\u0004\u0005\u0013\u0002\t\u0007\u000f\u0015\u0007\u0003\u0006\u0007\u0004\u0005\t\u0016\u0005 \u0002\u000f\t\u0004\u0002\f\u0002\r\t\u0004\u0002\t\u000e\u0003$\u0005\r%\u0007\r\t\u0002\u0013\u0014\u0007\f\u000f\u0002\u0015\u000e\u0004\u0005\t\u0002\u0003\t\u0002\u000f\t\u0007\r\u0014\u0017\t\u0010 #\u0003$\u0005\r%\u0007\u0015\u000e\u001e\u0003\t&\u000e\u0003\u0007\u0003\u0015\u000e\u0002\r\u0007\t\r\u0002/\u001d\u000e\u0002\r\u0002\t/\u001d\u0002\t\u000f\u0005\u0013\t\u0013\u001d+\u0002\u0014\u0005\u0013\t\u0005\f\u000f\u000e(\u0007\u0004\u0005\u0013\t\u0002\u0003\u001d%\u0002\r\u0007\u0004\u0005\u0013\t\u0002\u0003\t\u000f\u0005\u0013\t\u000e\u0003\u0015\u000e\u0013\u0005\u0013\t\u001b\t\u0018","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/uif-dtr-5.pdf","color":"#ffb74d","x":16.779090881347656,"y":23.853256225585938,"z":44.727294921875},{"id":59,"nombre":"OSA 1-23","tipo":"OSA","anio":"nan","tema":"nan","titulo":"Ver OSA N° 1-23","resumen":"DIRECCIÓN DE REGISTROS PÚBLICOS Y ARCHIVO JUDICIAL 19,30 y 40 CJ. PODER JUDICIAL MENDOZA OSA-N 01-23- UIF BENEFICIARIOS FINALES-MODIFICACION OS 341 DEL 2014 Las Disposiciones Técnico Registrales Conjuntas nro. 1 Y 2 del año 2014, (DTRC 1 y 2/14) la Orden de Servicio nro. 341 y la Disposición Técnico Registral Conjunta N' 5 \"Beneficiarios Finales\" (DTRC 5/23) del 10 de abril de 2023. CONSIDERANDO: Que la Orden de Servicio nro. 341 del 25 de Febrero del 2014, establece que el Oficial de Cumplimiento (OC) deberá verificar en los supuestos de escrituras de compraventa usufructo vitalicio, que se a","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/uif-os-A-1-23.pdf","color":"#81c784","x":-60.634498596191406,"y":79.20791625976562,"z":-83.640869140625},{"id":60,"nombre":"OSA 117-26","tipo":"OSA","anio":"nan","tema":"nan","titulo":"Ver OSA N° 117-26","resumen":"PODER JUDICIAL MENDOZA SUPREMA CORTE DE JUSTICIA DIRICCION DI; REGISTROS PÚBLICOS A RCHIVO JUIDICIAL Y 4\" (aR(:UNSCllFt:QN IUWICIAL ORDEN DE SERVICIQ ADMINISTRATIVA NO 117/2026 Lo dispuesto por la Ley N' 25.246 y sus modificatorias, y las Resoluciones N' 41/2011,112/2021 y 78/2025, de la Unidad de Información Financiera (UIF); y Que el artículo 20 de la Ley No 25.246 establece los Sujetos Obligados a informar la UNIDAD DE INFORMACIÓN FINANCIERA, en los términos   del artículo 21 del mismo cuerpo legal. Que el artículo 21 inciso b) determina que los Sujetos Obligados deben reportar a esta UNIDA","url":"https://jusmendoza.gob.ar/wp-content/uploads/2026/04/O.S.A.117-26-1.pdf","color":"#81c784","x":-63.452392578125,"y":69.58360290527344,"z":-80.67457580566406},{"id":61,"nombre":"OSC","tipo":"OSC","anio":"nan","tema":"nan","titulo":"Ver OSC 15-25","resumen":"PODER JUDICIAL MENDOZA SUPREMA CORTE DE JUSTICIA DIRECCIÓN lI; RIGISTROS PÚBLICOS  ARCHIVO IUDICIAL 1.3  ! 4' CIRCTNSCRIPC:ON ICDIClA: ORDEN DE SERVICIO DE CALIFICACIÓN NRO 15/25 MODIFICACIÓN ORDEN DE SERVICIO VIVIENDA LEY 14394 derogada_ Regulación: arts. 244 a 256 CCCN: VISTO: La necesidad de determinar la calificación registral en los supuestos relativos al régimen de protección de la vivienda_ CONSIDERANDO: Que actualmente rige lo establecido por las Órdenes de Servicio nro. 216, nro. 286 y nro. 396 anexo [X Que resulta conveniente unificar lo dispuesto en las Órdenes de Servicio mencionad","url":"https://jusmendoza.gob.ar/wp-content/uploads/2026/01/O.S.C.15-25-2.pdf","color":"#4fc3f7","x":-74.6233139038086,"y":53.083587646484375,"z":-88.49220275878906},{"id":62,"nombre":"Dictamen 29","tipo":"Dictamen","anio":"nan","tema":"nan","titulo":"Ver Dictamen 29","resumen":"S/19/23 INFORME DE TITULARIDAD ENT. 2479845 DEL 08/11/23 ASIEN- TO NRO. 1334 FOJAS 443 TOMO 8 DE LAS HERAS (actualmente matrícula ARABELA GHERZI, Asesora Letrada, se dirige a Ud. a los fines de elevar dictamen en las presentes actuaciones para su consideración. Se remite a esta Asesoría el expediente de referencia mediante el cual se solicita informe de dominio y estado jurídico del inmueble registrado a fs.","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/Dictamen-29-abandono-de-dominio-dominio-privado-del-Estado-1.pdf","color":"#80cbc4","x":83.34634399414062,"y":-59.654788970947266,"z":90.86158752441406},{"id":63,"nombre":"Dictamen 11","tipo":"Dictamen","anio":"nan","tema":"nan","titulo":"Ver Dictamen 11","resumen":"S/19/23 INFORME DE TITULARIDAD ENT. 2479845 DEL 08/11/23 ASIEN- TO NRO. 1334 FOJAS 443 TOMO 8 DE LAS HERAS (actualmente matrícula ARABELA GHERZI, Asesora Letrada, se dirige a Ud. a los fines de elevar dictamen en las presentes actuaciones para su consideración. Se remite a esta Asesoría el expediente de referencia mediante el cual se solicita informe de dominio y estado jurídico del inmueble registrado a fs.","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/Dictamen-11-accion-de-nulidad-cosa-juzgada.pdf","color":"#80cbc4","x":69.69972229003906,"y":-54.056297302246094,"z":96.20436096191406},{"id":64,"nombre":"Dictamen 27","tipo":"Dictamen","anio":"nan","tema":"nan","titulo":"Ver Dictamen 27","resumen":"S/19/23 INFORME DE TITULARIDAD ENT. 2479845 DEL 08/11/23 ASIEN- TO NRO. 1334 FOJAS 443 TOMO 8 DE LAS HERAS (actualmente matrícula ARABELA GHERZI, Asesora Letrada, se dirige a Ud. a los fines de elevar dictamen en las presentes actuaciones para su consideración. Se remite a esta Asesoría el expediente de referencia mediante el cual se solicita informe de dominio y estado jurídico del inmueble registrado a fs.","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/Dictamen-27-accion-de-nulidad-afectacion-a-terceros.pdf","color":"#80cbc4","x":66.48367309570312,"y":-51.769866943359375,"z":94.12109375},{"id":65,"nombre":"Dictamen 16","tipo":"Dictamen","anio":"nan","tema":"nan","titulo":"Ver Dictamen 16","resumen":"S/19/23 INFORME DE TITULARIDAD ENT. 2479845 DEL 08/11/23 ASIEN- TO NRO. 1334 FOJAS 443 TOMO 8 DE LAS HERAS (actualmente matrícula ARABELA GHERZI, Asesora Letrada, se dirige a Ud. a los fines de elevar dictamen en las presentes actuaciones para su consideración. Se remite a esta Asesoría el expediente de referencia mediante el cual se solicita informe de dominio y estado jurídico del inmueble registrado a fs.","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/Dictamen-16-donacion-a-la-municipalidad-dominio-publico.pdf","color":"#80cbc4","x":92.14512634277344,"y":-44.305274963378906,"z":89.88539123535156},{"id":66,"nombre":"Dictamen 20","tipo":"Dictamen","anio":"nan","tema":"nan","titulo":"Ver Dictamen 20","resumen":"S/19/23 INFORME DE TITULARIDAD ENT. 2479845 DEL 08/11/23 ASIEN- TO NRO. 1334 FOJAS 443 TOMO 8 DE LAS HERAS (actualmente matrícula ARABELA GHERZI, Asesora Letrada, se dirige a Ud. a los fines de elevar dictamen en las presentes actuaciones para su consideración. Se remite a esta Asesoría el expediente de referencia mediante el cual se solicita informe de dominio y estado jurídico del inmueble registrado a fs.","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/Dictamen-20-fideicomiso-revocacion-acto-adminsitrativo-admite-parcial.pdf","color":"#80cbc4","x":69.92582702636719,"y":-47.3250732421875,"z":90.21772766113281},{"id":67,"nombre":"Dictamen 31","tipo":"Dictamen","anio":"nan","tema":"nan","titulo":"Ver Dictamen 31","resumen":"S/19/23 INFORME DE TITULARIDAD ENT. 2479845 DEL 08/11/23 ASIEN- TO NRO. 1334 FOJAS 443 TOMO 8 DE LAS HERAS (actualmente matrícula ARABELA GHERZI, Asesora Letrada, se dirige a Ud. a los fines de elevar dictamen en las presentes actuaciones para su consideración. Se remite a esta Asesoría el expediente de referencia mediante el cual se solicita informe de dominio y estado jurídico del inmueble registrado a fs.","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/Dictamen-31-fideicomiso-titulo-causa.pdf","color":"#80cbc4","x":83.04222106933594,"y":-38.727386474609375,"z":85.15457153320312},{"id":68,"nombre":"Dictamen 23","tipo":"Dictamen","anio":"nan","tema":"nan","titulo":"Ver Dictamen 23","resumen":"S/19/23 INFORME DE TITULARIDAD ENT. 2479845 DEL 08/11/23 ASIEN- TO NRO. 1334 FOJAS 443 TOMO 8 DE LAS HERAS (actualmente matrícula ARABELA GHERZI, Asesora Letrada, se dirige a Ud. a los fines de elevar dictamen en las presentes actuaciones para su consideración. Se remite a esta Asesoría el expediente de referencia mediante el cual se solicita informe de dominio y estado jurídico del inmueble registrado a fs.","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/Dictamen-23-prescripcion-adquisitiva-adquisicion-previa.pdf","color":"#80cbc4","x":71.20806884765625,"y":-37.3126220703125,"z":91.92572021484375},{"id":69,"nombre":"Dictamen 26","tipo":"Dictamen","anio":"nan","tema":"nan","titulo":"Ver Dictamen 26","resumen":"S/19/23 INFORME DE TITULARIDAD ENT. 2479845 DEL 08/11/23 ASIEN- TO NRO. 1334 FOJAS 443 TOMO 8 DE LAS HERAS (actualmente matrícula ARABELA GHERZI, Asesora Letrada, se dirige a Ud. a los fines de elevar dictamen en las presentes actuaciones para su consideración. Se remite a esta Asesoría el expediente de referencia mediante el cual se solicita informe de dominio y estado jurídico del inmueble registrado a fs.","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/Dictamen-26-principio-de-especialidad-superficie-ad-corpus.pdf","color":"#80cbc4","x":76.84341430664062,"y":-53.90496063232422,"z":87.26177978515625},{"id":70,"nombre":"Dictamen 25","tipo":"Dictamen","anio":"nan","tema":"nan","titulo":"Ver Dictamen 25","resumen":"S/19/23 INFORME DE TITULARIDAD ENT. 2479845 DEL 08/11/23 ASIEN- TO NRO. 1334 FOJAS 443 TOMO 8 DE LAS HERAS (actualmente matrícula ARABELA GHERZI, Asesora Letrada, se dirige a Ud. a los fines de elevar dictamen en las presentes actuaciones para su consideración. Se remite a esta Asesoría el expediente de referencia mediante el cual se solicita informe de dominio y estado jurídico del inmueble registrado a fs.","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/Dictamen-25-protocolizacion-expte-administrativo-revocacion-de-donacion.pdf","color":"#80cbc4","x":82.42478942871094,"y":-40.73454284667969,"z":100.0},{"id":71,"nombre":"Dictamen 19","tipo":"Dictamen","anio":"nan","tema":"nan","titulo":"Ver Dictamen 19","resumen":"S/19/23 INFORME DE TITULARIDAD ENT. 2479845 DEL 08/11/23 ASIEN- TO NRO. 1334 FOJAS 443 TOMO 8 DE LAS HERAS (actualmente matrícula ARABELA GHERZI, Asesora Letrada, se dirige a Ud. a los fines de elevar dictamen en las presentes actuaciones para su consideración. Se remite a esta Asesoría el expediente de referencia mediante el cual se solicita informe de dominio y estado jurídico del inmueble registrado a fs.","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/Dictamen-19-rectificacion-de-asiento-rechaza.pdf","color":"#80cbc4","x":76.29354858398438,"y":-32.101478576660156,"z":96.47383117675781},{"id":72,"nombre":"Dictamen 28","tipo":"Dictamen","anio":"nan","tema":"nan","titulo":"Ver Dictamen 28","resumen":"S/19/23 INFORME DE TITULARIDAD ENT. 2479845 DEL 08/11/23 ASIEN- TO NRO. 1334 FOJAS 443 TOMO 8 DE LAS HERAS (actualmente matrícula ARABELA GHERZI, Asesora Letrada, se dirige a Ud. a los fines de elevar dictamen en las presentes actuaciones para su consideración. Se remite a esta Asesoría el expediente de referencia mediante el cual se solicita informe de dominio y estado jurídico del inmueble registrado a fs.","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/Dictamen-28-rectificacion-escritura-publica-error-en-la-fecha.pdf","color":"#80cbc4","x":77.73658752441406,"y":-32.198219299316406,"z":87.85708618164062},{"id":73,"nombre":"Dictamen 21","tipo":"Dictamen","anio":"nan","tema":"nan","titulo":"Ver Dictamen 21","resumen":"S/19/23 INFORME DE TITULARIDAD ENT. 2479845 DEL 08/11/23 ASIEN- TO NRO. 1334 FOJAS 443 TOMO 8 DE LAS HERAS (actualmente matrícula ARABELA GHERZI, Asesora Letrada, se dirige a Ud. a los fines de elevar dictamen en las presentes actuaciones para su consideración. Se remite a esta Asesoría el expediente de referencia mediante el cual se solicita informe de dominio y estado jurídico del inmueble registrado a fs.","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/Dictamen-21-regimen-patrimonial-del-matrimonio-asentimiento-rechaza.pdf","color":"#80cbc4","x":91.67987060546875,"y":-58.65475845336914,"z":88.30072021484375},{"id":74,"nombre":"Dictamen 8","tipo":"Dictamen","anio":"nan","tema":"nan","titulo":"Ver Dictamen 8","resumen":"S/19/23 INFORME DE TITULARIDAD ENT. 2479845 DEL 08/11/23 ASIEN- TO NRO. 1334 FOJAS 443 TOMO 8 DE LAS HERAS (actualmente matrícula ARABELA GHERZI, Asesora Letrada, se dirige a Ud. a los fines de elevar dictamen en las presentes actuaciones para su consideración. Se remite a esta Asesoría el expediente de referencia mediante el cual se solicita informe de dominio y estado jurídico del inmueble registrado a fs.","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/Dictamen-8-Revocacion-acto-administrativo-Reproduccion.pdf","color":"#80cbc4","x":100.0,"y":-45.719940185546875,"z":85.38749694824219},{"id":75,"nombre":"Dictamen 12","tipo":"Dictamen","anio":"nan","tema":"nan","titulo":"Ver Dictamen 12","resumen":"S/19/23 INFORME DE TITULARIDAD ENT. 2479845 DEL 08/11/23 ASIEN- TO NRO. 1334 FOJAS 443 TOMO 8 DE LAS HERAS (actualmente matrícula ARABELA GHERZI, Asesora Letrada, se dirige a Ud. a los fines de elevar dictamen en las presentes actuaciones para su consideración. Se remite a esta Asesoría el expediente de referencia mediante el cual se solicita informe de dominio y estado jurídico del inmueble registrado a fs.","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/Dictamen-12-revocacion-acto-administrativo-reproduccion.pdf","color":"#80cbc4","x":95.28346252441406,"y":-58.981929779052734,"z":93.00611877441406},{"id":76,"nombre":"Dictamen 17","tipo":"Dictamen","anio":"nan","tema":"nan","titulo":"Ver Dictamen 17","resumen":"S/19/23 INFORME DE TITULARIDAD ENT. 2479845 DEL 08/11/23 ASIEN- TO NRO. 1334 FOJAS 443 TOMO 8 DE LAS HERAS (actualmente matrícula ARABELA GHERZI, Asesora Letrada, se dirige a Ud. a los fines de elevar dictamen en las presentes actuaciones para su consideración. Se remite a esta Asesoría el expediente de referencia mediante el cual se solicita informe de dominio y estado jurídico del inmueble registrado a fs.","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/Dictamen-17-revocacion-acto-administrativo-reproduccion.pdf","color":"#80cbc4","x":92.17140197753906,"y":-43.79747009277344,"z":94.98976135253906},{"id":77,"nombre":"Dictamen 24","tipo":"Dictamen","anio":"nan","tema":"nan","titulo":"Ver Dictamen 24","resumen":"S/19/23 INFORME DE TITULARIDAD ENT. 2479845 DEL 08/11/23 ASIEN- TO NRO. 1334 FOJAS 443 TOMO 8 DE LAS HERAS (actualmente matrícula ARABELA GHERZI, Asesora Letrada, se dirige a Ud. a los fines de elevar dictamen en las presentes actuaciones para su consideración. Se remite a esta Asesoría el expediente de referencia mediante el cual se solicita informe de dominio y estado jurídico del inmueble registrado a fs.","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/Dictamen-24-revocacion-acto-administrativo-sin-reproduccion.pdf","color":"#80cbc4","x":81.76869201660156,"y":-53.83592987060547,"z":98.44651794433594},{"id":78,"nombre":"Dictamen 18","tipo":"Dictamen","anio":"nan","tema":"nan","titulo":"Ver Dictamen 18","resumen":"S/19/23 INFORME DE TITULARIDAD ENT. 2479845 DEL 08/11/23 ASIEN- TO NRO. 1334 FOJAS 443 TOMO 8 DE LAS HERAS (actualmente matrícula ARABELA GHERZI, Asesora Letrada, se dirige a Ud. a los fines de elevar dictamen en las presentes actuaciones para su consideración. Se remite a esta Asesoría el expediente de referencia mediante el cual se solicita informe de dominio y estado jurídico del inmueble registrado a fs.","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/Dictamen-18-sucesiones-adjudicacion.pdf","color":"#80cbc4","x":86.81130981445312,"y":-28.640403747558594,"z":92.22129821777344},{"id":79,"nombre":"Dictamen 15","tipo":"Dictamen","anio":"nan","tema":"nan","titulo":"Ver Dictamen 15","resumen":"S/19/23 INFORME DE TITULARIDAD ENT. 2479845 DEL 08/11/23 ASIEN- TO NRO. 1334 FOJAS 443 TOMO 8 DE LAS HERAS (actualmente matrícula ARABELA GHERZI, Asesora Letrada, se dirige a Ud. a los fines de elevar dictamen en las presentes actuaciones para su consideración. Se remite a esta Asesoría el expediente de referencia mediante el cual se solicita informe de dominio y estado jurídico del inmueble registrado a fs.","url":"https://jusmendoza.gob.ar/wp-content/uploads/2024/04/Dictamen-15-vivienda-desafectacion-rechazo.pdf","color":"#80cbc4","x":73.56282043457031,"y":-67.37400817871094,"z":88.36395263671875}],"tipos":["OSC","OSA","DTR","Ley","Decreto","Dictamen","Acordada","Resolución","Resolución Administrativa","Resolución Conjunta","Plano"],"colores":{"OSC":"#4fc3f7","OSA":"#81c784","DTR":"#ffb74d","Ley":"#ce93d8","Decreto":"#f48fb1","Dictamen":"#80cbc4","Acordada":"#fff176","Resolución":"#ff8a65","Resolución Administrativa":"#a5d6a7","Resolución Conjunta":"#90caf9","Plano":"#bcaaa4"}};
+
+puntos = _data.puntos;
+construirEscena(_data.puntos, _data.colores);
+construirLeyenda(_data.colores, _data.puntos);
+construirFiltroPanel(_data.tipos, _data.colores);
+crearLineas(_data.puntos);
+crearEtiquetasCluster(_data.colores, _data.puntos);
+
+// ── Pulso automático cíclico ──────────────────────────────────
+const TIPOS_PULSO = Object.keys(_data.colores).filter(t => puntos.some(p => p.tipo === t));
+
+setInterval(() => {
+  if (!TIPOS_PULSO.length) return;
+  const tipo = TIPOS_PULSO[tipoPulsoIdx % TIPOS_PULSO.length];
+  tipoPulsoIdx++;
+  if (tipo === tipoHover) return; // no interferir con hover activo
+  const colorHex = _data.colores[tipo];
+  const t0 = performance.now();
+  const dur = 2200;
+  meshes.forEach((m, i) => {
+    if (puntos[i]?.tipo === tipo && m.visible)
+      pulsoAnimaciones.push({ m, i, colorHex, t0, dur });
+  });
+}, 3000);
+
+function crearEsqueletoClusters(colores, pts) {
+  // centroide por tipo
+  const grupos = {};
+  pts.forEach((p, i) => {
+    if (!grupos[p.tipo]) grupos[p.tipo] = [];
+    grupos[p.tipo].push(i);
+  });
+
+  const centroides = {};
+  Object.entries(grupos).forEach(([tipo, indices]) => {
+    let cx = 0, cy = 0, cz = 0;
+    indices.forEach(i => { cx += meshes[i].position.x; cy += meshes[i].position.y; cz += meshes[i].position.z; });
+    centroides[tipo] = new THREE.Vector3(cx / indices.length, cy / indices.length, cz / indices.length);
+  });
+
+  const tipos = Object.keys(centroides);
+  const MAX_DIST = 40;
+  const positions = [];
+  const colors    = [];
+
+  for (let a = 0; a < tipos.length; a++) {
+    for (let b = a + 1; b < tipos.length; b++) {
+      const ta = tipos[a], tb = tipos[b];
+      const ca = centroides[ta], cb = centroides[tb];
+      const dist = ca.distanceTo(cb);
+      if (dist > MAX_DIST) continue;
+
+      // opacidad inversamente proporcional a la distancia
+      const t  = 1 - dist / MAX_DIST;
+      const ca3 = new THREE.Color(colores[ta] || '#fff');
+      const cb3 = new THREE.Color(colores[tb] || '#fff');
+      const mid = ca3.clone().lerp(cb3, 0.5);
+
+      positions.push(ca.x, ca.y, ca.z, cb.x, cb.y, cb.z);
+      colors.push(mid.r * t + 0.3, mid.g * t + 0.3, mid.b * t + 0.3,
+                  mid.r * t + 0.3, mid.g * t + 0.3, mid.b * t + 0.3);
+    }
+  }
+
+  if (!positions.length) return;
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('color',    new THREE.Float32BufferAttribute(colors, 3));
+
+  const mat = new THREE.LineDashedMaterial({
+    vertexColors: true, transparent: true, opacity: 0.55,
+    dashSize: 3, gapSize: 2, depthWrite: false,
+  });
+
+  const skeleton = new THREE.LineSegments(geo, mat);
+  skeleton.computeLineDistances();
+  pivot.add(skeleton);
+}
+
+function crearLineas(pts) {
+  const K        = 8;
+  const MAX_DIST = 18; // no dibujar líneas más largas que esto
+  const intraPos = [], intraCol = [];
+  const interPos = [];
+  const drawn    = new Set();
+
+  pts.forEach((p, i) => {
+    const pos_i = meshes[i].position;
+    const ci    = new THREE.Color(p.color);
+
+    const vecinos = pts
+      .map((q, j) => ({ j, d: j === i ? Infinity : pos_i.distanceTo(meshes[j].position) }))
+      .sort((a, b) => a.d - b.d)
+      .slice(0, K);
+
+    vecinos.forEach(({ j, d }) => {
+      if (d > MAX_DIST) return; // cortar líneas demasiado largas
+      const key = i < j ? `${i}-${j}` : `${j}-${i}`;
+      if (drawn.has(key)) return;
+      drawn.add(key);
+      const pos_j = meshes[j].position;
+      const cj    = new THREE.Color(pts[j].color);
+      if (pts[i].tipo === pts[j].tipo) {
+        intraPos.push(pos_i.x, pos_i.y, pos_i.z, pos_j.x, pos_j.y, pos_j.z);
+        intraCol.push(ci.r, ci.g, ci.b, cj.r, cj.g, cj.b);
+      } else {
+        interPos.push(pos_i.x, pos_i.y, pos_i.z, pos_j.x, pos_j.y, pos_j.z);
+      }
+    });
+  });
+
+  // intra-cluster: filamento pálido muy sutil
+  if (intraPos.length) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(intraPos, 3));
+    pivot.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({
+      color: 0xb0a898, transparent: true, opacity: 0.1, depthWrite: false,
+    })));
+  }
+
+  // inter-cluster: casi invisible
+  if (interPos.length) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(interPos, 3));
+    pivot.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({
+      color: 0x887060, transparent: true, opacity: 0.04, depthWrite: false,
+    })));
+  }
+}
+
+function crearEtiquetasCluster(colores, pts) {
+  const grupos = {};
+  pts.forEach((p, i) => {
+    if (!grupos[p.tipo]) grupos[p.tipo] = [];
+    grupos[p.tipo].push(i);
+  });
+
+  Object.entries(grupos).forEach(([tipo, indices]) => {
+    let cx = 0, cy = 0, cz = 0;
+    indices.forEach(i => { cx += meshes[i].position.x; cy += meshes[i].position.y; cz += meshes[i].position.z; });
+    cx /= indices.length; cy /= indices.length; cz /= indices.length;
+
+    const W = 256, H = 56;
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    const color = colores[tipo] || '#ffffff';
+
+    // fondo semitransparente con borde coloreado
+    ctx.beginPath();
+    ctx.roundRect(4, 4, W - 8, H - 8, 10);
+    ctx.fillStyle = 'rgba(4,8,24,0.72)';
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    ctx.fillStyle = color;
+    ctx.font = 'bold 19px "Segoe UI", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(tipo, W / 2, H / 2);
+
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: new THREE.CanvasTexture(canvas),
+      transparent: true, opacity: 0.9, depthWrite: false,
+    }));
+    sprite.scale.set(13, 2.8, 1);
+    sprite.position.set(cx, cy + 8, cz);
+    sprite.visible = false;
+    pivot.add(sprite);
+    etiquetasCluster[tipo] = sprite;
+  });
+}
+
+function resetearNodoPalido(m, i) {
+  const c = new THREE.Color(puntos[i]?.color || '#ffffff');
+  m.material.color.copy(c);
+  m.material.emissive.copy(c);
+  m.material.emissiveIntensity = 0.6;
+  if (halos[i]) {
+    halos[i].mesh.material.color.copy(c);
+    halos[i].mesh.material.opacity = 0.22;
+    if (halos[i].outline) {
+      halos[i].outline.material.color.copy(c);
+      halos[i].outline.material.opacity = 0.85;
+    }
+  }
+}
+
+function iluminarNodo(m, i, colorHex, intensidad) {
+  const c = new THREE.Color(colorHex);
+  m.material.color.copy(c);
+  m.material.emissive.copy(c);
+  m.material.emissiveIntensity = intensidad;
+  if (halos[i]) {
+    halos[i].mesh.material.color.copy(c);
+    halos[i].mesh.material.opacity = 0.07 + intensidad * 0.3;
+    if (halos[i].outline) {
+      halos[i].outline.material.color.copy(c);
+      halos[i].outline.material.opacity = intensidad * 0.6;
+    }
+  }
+}
+
+function construirEscena(pts, colores) {
+  pts.forEach((p, i) => {
+    const geo = new THREE.SphereGeometry(1.1, 12, 12);
+    const mat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(p.color),
+      emissive: new THREE.Color(p.color),
+      emissiveIntensity: 0.6,
+      roughness: 0.3, metalness: 0.1,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    const jx = (((i * 7919) % 200) - 100) / 100 * 3.5;
+    const jy = (((i * 6271) % 200) - 100) / 100 * 3.5;
+    const jz = (((i * 4831) % 200) - 100) / 100 * 3.5;
+    mesh.position.set(p.x * ESCALA + jx, p.y * ESCALA + jy, p.z * ESCALA + jz);
+    mesh.userData = { idx: i, colorVivid: p.color, tipo: p.tipo };
+    pivot.add(mesh);
+    meshes.push(mesh);
+
+    // Contorno
+    const outlineGeo = new THREE.SphereGeometry(1.28, 12, 12);
+    const outlineMat = new THREE.MeshBasicMaterial({
+      color: new THREE.Color(p.color),
+      side: THREE.BackSide,
+      transparent: true,
+      opacity: 0.85,
+    });
+    const outline = new THREE.Mesh(outlineGeo, outlineMat);
+    outline.position.copy(mesh.position);
+    pivot.add(outline);
+
+    // Halo suave
+    const haloIn = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: haloTextura,
+      color: new THREE.Color(p.color),
+      transparent: true, opacity: 0.22, depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    }));
+    haloIn.scale.set(5, 5, 1);
+    haloIn.position.copy(mesh.position);
+    pivot.add(haloIn);
+
+    halos.push({ mesh: haloIn, outer: haloIn, outline });
+  });
+}
+
+// ── Leyenda ──────────────────────────────────────────────────
+function construirLeyenda(colores, pts) {
+  const conteo = {};
+  pts.forEach(p => conteo[p.tipo] = (conteo[p.tipo] || 0) + 1);
+  const div = document.getElementById('leyenda-panel');
+  Object.entries(colores).forEach(([tipo, color]) => {
+    if (!conteo[tipo]) return;
+    const item = document.createElement('div');
+    item.className = 'leyenda-item';
+    item.dataset.tipo = tipo;
+    item.innerHTML = `<div class="leyenda-dot" style="background:${color}"></div>${tipo} <span style="opacity:.4;margin-left:2px">(${conteo[tipo]})</span>`;
+    div.appendChild(item);
+  });
+}
+
+// ── Panel de filtros ─────────────────────────────────────────
+function construirFiltroPanel(tipos, colores) {
+  const lista = document.getElementById('filtro-tipos-lista');
+  _data.tipos.forEach(tipo => {
+    const hasPuntos = puntos.some(p => p.tipo === tipo);
+    if (!hasPuntos) return;
+    const color = colores[tipo] || '#aaa';
+    const row = document.createElement('div');
+    row.className = 'filtro-tipo-item';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.checked = true; cb.id = 'cb-' + tipo;
+    const dot = document.createElement('span');
+    dot.style.cssText = `display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0`;
+    const lbl = document.createElement('span');
+    lbl.textContent = tipo;
+    row.appendChild(cb); row.appendChild(dot); row.appendChild(lbl);
+    row.addEventListener('click', e => { if (e.target !== cb) cb.checked = !cb.checked; });
+    lista.appendChild(row);
+    checkboxesTipo[tipo] = cb;
+  });
+}
+
+document.getElementById('btn-deseleccionar-todos').addEventListener('click', () => {
+  Object.values(checkboxesTipo).forEach(cb => cb.checked = false);
+});
+
+document.getElementById('btn-restablecer').addEventListener('click', () => {
+  Object.values(checkboxesTipo).forEach(cb => cb.checked = true);
+  document.getElementById('anio-desde').value = '';
+  document.getElementById('anio-hasta').value = '';
+  filtroTipos.clear();
+  filtroAnioDesde = null; filtroAnioHasta = null;
+  aplicarFiltro();
+});
+
+document.getElementById('btn-aplicar').addEventListener('click', () => {
+  filtroTipos.clear();
+  Object.entries(checkboxesTipo).forEach(([tipo, cb]) => {
+    if (!cb.checked) filtroTipos.add(tipo);
+  });
+  const d = document.getElementById('anio-desde').value;
+  const h = document.getElementById('anio-hasta').value;
+  filtroAnioDesde = d ? parseInt(d) : null;
+  filtroAnioHasta = h ? parseInt(h) : null;
+  aplicarFiltro();
+  cerrarPanelLateral('filtro');
+});
+
+function aplicarFiltro() {
+  meshes.forEach((mesh, i) => {
+    const p = puntos[i];
+    let oculto = filtroTipos.has(p.tipo);
+    if (!oculto && (filtroAnioDesde || filtroAnioHasta)) {
+      const anioVal = p.anio && p.anio !== 'nan' ? parseInt(p.anio) : null;
+      if (anioVal !== null) {
+        if (filtroAnioDesde && anioVal < filtroAnioDesde) oculto = true;
+        if (filtroAnioHasta && anioVal > filtroAnioHasta) oculto = true;
+      } else if (filtroAnioDesde || filtroAnioHasta) {
+        // sin año: ocultar si hay filtro de año activo
+        oculto = true;
+      }
+    }
+    mesh.visible = !oculto;
+    halos[i].mesh.visible    = !oculto;
+    halos[i].outer.visible   = !oculto;
+    if (halos[i].outline) halos[i].outline.visible = !oculto;
+  });
+}
+
+// ── Panel detalle ────────────────────────────────────────────
+const panelDetalle = document.getElementById('panel-detalle');
+
+function abrirPanel(p) {
+  const badge = document.getElementById('pd-tipo-badge');
+  badge.textContent = p.tipo;
+  badge.style.cssText = `background:${p.color}22;color:${p.color};border:1px solid ${p.color}44;display:inline-block;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;margin-bottom:12px;`;
+
+  document.getElementById('pd-titulo').textContent = p.titulo;
+
+  const campos = document.getElementById('pd-campos');
+  campos.innerHTML = '';
+  const ag = (label, valor) => {
+    if (!valor || valor === 'nan') return;
+    const d = document.createElement('div');
+    d.className = 'pd-campo';
+    d.innerHTML = `<div class="label">${label}</div><div class="valor">${valor}</div>`;
+    campos.appendChild(d);
+  };
+  ag('Nombre Norma', p.nombre);
+  ag('Tipo Norma',   p.tipo);
+  if (p.anio && p.anio !== 'nan') ag('Año', p.anio.replace('.0',''));
+  if (p.tema && p.tema !== 'nan') ag('Tema', p.tema);
+  if (p.resumen && p.resumen !== 'nan' && p.resumen.trim()) {
+    const d = document.createElement('div');
+    d.className = 'pd-campo';
+    d.innerHTML = `<div class="label">Resumen</div><div class="valor" style="font-size:11px;line-height:1.6;opacity:0.85;white-space:normal">${p.resumen}</div>`;
+    campos.appendChild(d);
+  }
+
+  const btn = document.getElementById('pd-btn-ver');
+  btn.href = p.url || '#';
+  btn.classList.toggle('sin-url', !p.url);
+  btn.textContent = p.url ? 'Ver documento' : 'Sin documento disponible';
+
+  panelDetalle.classList.add('abierto');
+}
+
+document.getElementById('btn-cerrar').addEventListener('click', () => {
+  panelDetalle.classList.remove('abierto');
+});
+
+// ── Sidebar panels ───────────────────────────────────────────
+let panelAbierto = null;
+
+function cerrarPanelLateral(nombre) {
+  if (nombre === 'leyenda' || panelAbierto === 'leyenda') {
+    document.getElementById('leyenda-panel').classList.remove('visible');
+    document.getElementById('btn-ojo').classList.remove('active');
+  }
+  if (nombre === 'filtro' || panelAbierto === 'filtro') {
+    document.getElementById('filtro-panel').classList.remove('visible');
+    document.getElementById('btn-filtro').classList.remove('active');
+  }
+  if (nombre === 'buscar' || panelAbierto === 'buscar') {
+    document.getElementById('buscar-container').classList.remove('visible');
+    document.getElementById('btn-buscar-toggle').classList.remove('active');
+  }
+  if (panelAbierto === nombre) panelAbierto = null;
+}
+
+function togglePanelLateral(nombre) {
+  const panelIds = { leyenda: 'leyenda-panel', filtro: 'filtro-panel', buscar: 'buscar-container' };
+  const btnIds   = { leyenda: 'btn-ojo', filtro: 'btn-filtro', buscar: 'btn-buscar-toggle' };
+
+  if (panelAbierto && panelAbierto !== nombre) {
+    document.getElementById(panelIds[panelAbierto]).classList.remove('visible');
+    document.getElementById(btnIds[panelAbierto]).classList.remove('active');
+    panelAbierto = null;
+  }
+  const estaAbierto = document.getElementById(panelIds[nombre]).classList.contains('visible');
+  if (estaAbierto) {
+    document.getElementById(panelIds[nombre]).classList.remove('visible');
+    document.getElementById(btnIds[nombre]).classList.remove('active');
+    panelAbierto = null;
+  } else {
+    document.getElementById(panelIds[nombre]).classList.add('visible');
+    document.getElementById(btnIds[nombre]).classList.add('active');
+    panelAbierto = nombre;
+    if (nombre === 'buscar') {
+      document.getElementById('input-buscar').focus();
+      renderChips(modoActual);
+    }
+  }
+}
+
+document.getElementById('btn-ojo').addEventListener('click', () => togglePanelLateral('leyenda'));
+document.getElementById('btn-buscar-toggle').addEventListener('click', () => togglePanelLateral('buscar'));
+document.getElementById('btn-filtro').addEventListener('click', () => togglePanelLateral('filtro'));
+// ── Info modal ───────────────────────────────────────────────
+const infoOverlay = document.getElementById('info-overlay');
+
+function abrirInfo() {
+  infoOverlay.classList.add('visible');
+  if (panelAbierto) {
+    cerrarPanelLateral(panelAbierto);
+  }
+}
+function cerrarInfo() { infoOverlay.classList.remove('visible'); }
+
+document.getElementById('btn-info').addEventListener('click', abrirInfo);
+document.getElementById('btn-cerrar-info').addEventListener('click', cerrarInfo);
+infoOverlay.addEventListener('click', e => { if (e.target === infoOverlay) cerrarInfo(); });
+
+// ── Buscador con resultados ──────────────────────────────────
+const inputBuscar   = document.getElementById('input-buscar');
+const resultadosDiv = document.getElementById('buscar-resultados');
+const btnLimpiar    = document.getElementById('btn-limpiar-buscar');
+
+function buscar(q) {
+  resultadosDiv.innerHTML = '';
+  if (!q) { resultadosDiv.classList.remove('visible'); return; }
+
+  const matches = puntos.filter(p =>
+    p.nombre.toLowerCase().includes(q) ||
+    p.titulo.toLowerCase().includes(q) ||
+    p.tipo.toLowerCase().includes(q)
+  ).slice(0, 20);
+
+  if (matches.length === 0) {
+    resultadosDiv.innerHTML = '<div class="no-resultados">Sin resultados para "' + q + '"</div>';
+    resultadosDiv.classList.add('visible');
+    return;
+  }
+
+  matches.forEach(p => {
+    const item = document.createElement('div');
+    item.className = 'resultado-item';
+    item.innerHTML = `
+      <span class="resultado-icon">&#128196;</span>
+      <div class="resultado-info">
+        <div class="r-nombre">${p.nombre}</div>
+        <div class="r-tipo">${p.tipo}</div>
+        <div class="r-titulo">${p.titulo !== p.nombre ? p.titulo : ''}</div>
+      </div>`;
+    item.addEventListener('click', () => {
+      abrirPanel(p);
+      const idx = puntos.indexOf(p);
+      if (idx !== -1 && meshes[idx]) focusNodo(meshes[idx]);
+      resultadosDiv.classList.remove('visible');
+      inputBuscar.value = '';
+      btnLimpiar.classList.remove('visible');
+    });
+    resultadosDiv.appendChild(item);
+  });
+  resultadosDiv.classList.add('visible');
+}
+
+inputBuscar.addEventListener('input', e => {
+  const q = e.target.value.trim();
+  btnLimpiar.classList.toggle('visible', q.length > 0);
+  chipsDiv.classList.toggle('oculto', q.length > 0);
+  if (modoActual === 'recuperar') buscar(q.toLowerCase());
+});
+
+// ── Modo de búsqueda ─────────────────────────────────────────
+let modoActual = 'consultar';
+
+const CHIPS = {
+  recuperar: ['hipoteca', 'cancelación inhibición', 'certificado dominio', 'tracto sucesivo'],
+  consultar: [
+    '¿Qué establece la Ley 17801?',
+    '¿Qué autoriza la Ley 6279?',
+    '¿Qué establece la Ley 8236?',
+    '¿Qué información brinda el Registro de la Propiedad Inmueble?',
+    '¿Qué es una cancelación de inhibición?',
+  ],
+};
+
+const chipsDiv = document.getElementById('buscar-chips');
+
+function renderChips(modo) {
+  chipsDiv.innerHTML = '';
+  CHIPS[modo].forEach(texto => {
+    const chip = document.createElement('button');
+    chip.className = 'chip';
+    chip.textContent = texto;
+    chip.addEventListener('click', () => {
+      inputBuscar.value = texto;
+      btnLimpiar.classList.add('visible');
+      chipsDiv.classList.add('oculto');
+      ejecutarBusqueda();
+    });
+    chipsDiv.appendChild(chip);
+  });
+  chipsDiv.classList.remove('oculto');
+}
+
+const consultarPanel  = document.getElementById('consultar-panel');
+const consultarLoad   = document.getElementById('consultar-loading');
+const consultarResp   = document.getElementById('consultar-respuesta');
+const consultarFuentes = document.getElementById('consultar-fuentes');
+
+function setModo(modo) {
+  modoActual = modo;
+  document.getElementById('tab-recuperar').classList.toggle('activo', modo === 'recuperar');
+  document.getElementById('tab-consultar').classList.toggle('activo', modo === 'consultar');
+  const esConsultar = modo === 'consultar';
+  document.getElementById('buscar-top').style.display = esConsultar ? 'none' : '';
+  document.getElementById('btn-buscar-action').textContent = esConsultar ? 'Consultar' : 'Buscar';
+  inputBuscar.placeholder = esConsultar ? 'Hacé una pregunta sobre las normas...' : 'Buscar norma...';
+  resultadosDiv.classList.remove('visible');
+  consultarPanel.classList.remove('visible');
+  inputBuscar.value = '';
+  btnLimpiar.classList.remove('visible');
+  renderChips(modo);
+  inputBuscar.focus();
+}
+
+document.getElementById('tab-recuperar').addEventListener('click', () => setModo('recuperar'));
+document.getElementById('tab-consultar').addEventListener('click', () => setModo('consultar'));
+
+// ── Recuperar (semántico, no generativo) ─────────────────────
+async function buscarSemantico(q) {
+  if (!q) return;
+  resultadosDiv.innerHTML = '<div style="padding:12px;color:rgba(237,224,196,0.4);font-size:12px">Buscando...</div>';
+  resultadosDiv.classList.add('visible');
+  try {
+    const top = document.getElementById('buscar-top').value;
+    const resp = await fetch(`/api/buscar?q=${encodeURIComponent(q)}&top=${top}`);
+    if (!resp.ok) throw new Error('servidor no disponible');
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+
+    resultadosDiv.innerHTML = '';
+    if (!data.length) {
+      resultadosDiv.innerHTML = '<div class="no-resultados">Sin resultados semánticos</div>';
+      return;
+    }
+    data.forEach(r => {
+      const p = puntos.find(pt => pt.nombre === r.nombre_norma);
+      const pct = Math.round((r.similitud ?? 0) * 100);
+      const item = document.createElement('div');
+      item.className = 'resultado-item';
+      item.innerHTML = `
+        <span class="resultado-icon">&#128269;</span>
+        <div class="resultado-info">
+          <div class="r-nombre">${r.nombre_norma}</div>
+          <div class="r-tipo">${r.tipo_norma} <span style="color:#c9a227;margin-left:8px">${pct}% similar</span></div>
+          ${r.titulo_resumido && r.titulo_resumido !== r.nombre_norma ? `<div class="r-titulo">${r.titulo_resumido}</div>` : ''}
+        </div>`;
+      item.addEventListener('click', () => {
+        if (p) { abrirPanel(p); const idx = puntos.indexOf(p); if (idx !== -1) focusNodo(meshes[idx]); }
+        else if (r.url_pdf) window.open(r.url_pdf, '_blank');
+        resultadosDiv.classList.remove('visible');
+        inputBuscar.value = ''; btnLimpiar.classList.remove('visible');
+      });
+      resultadosDiv.appendChild(item);
+    });
+  } catch(e) {
+    buscar(q.toLowerCase()); // fallback local
+  }
+}
+
+// ── Markdown mínimo para respuestas del modelo ────────────────
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function markdownLeve(txt, fuentesMap = {}) {
+  // Reemplaza cada nombre de norma conocido (citado como [Nombre] o directo en prosa) por
+  // un placeholder, antes de escapar/formatear — así no depende de que el modelo use corchetes.
+  const nombres = Object.keys(fuentesMap).filter(n => fuentesMap[n]).sort((a, b) => b.length - a.length);
+  const links = [];
+  let working = txt;
+  nombres.forEach(nombre => {
+    const re = new RegExp(`\\[?${escapeRegExp(nombre)}\\]?`, 'g');
+    working = working.replace(re, () => {
+      const ph = `@@${links.length}@@`;
+      links.push(nombre);
+      return ph;
+    });
+  });
+
+  let html = working
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/^#{1,3}\s+(.+)$/gm, '<strong style="display:block;margin-top:10px">$1</strong>')
+    .replace(/^\d+\.\s+/gm, match => `<br>${match}`)
+    .replace(/\n{2,}/g, '<br><br>')
+    .replace(/\n/g, '<br>');
+
+  links.forEach((nombre, idx) => {
+    const url = fuentesMap[nombre];
+    const link = `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:#c9a227;font-weight:600;text-decoration:none;border-bottom:1px dotted rgba(201,162,39,0.5)">[${nombre}]</a>`;
+    html = html.split(`@@${idx}@@`).join(link);
+  });
+
+  return html;
+}
+
+// ── Consultar (RAG generativo) ────────────────────────────────
+async function buscarConsultar(q) {
+  if (!q) return;
+  consultarResp.innerHTML = '';
+  consultarFuentes.innerHTML = '<div class="fuentes-titulo">Fuentes consultadas</div>';
+  consultarLoad.classList.add('visible');
+  consultarPanel.classList.add('visible');
+
+  try {
+    const resp = await fetch(`/api/consultar?q=${encodeURIComponent(q)}&top=5`);
+    if (!resp.ok) throw new Error('servidor no disponible');
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+
+    consultarLoad.classList.remove('visible');
+    const fuentesMap = {};
+    (data.fuentes || []).forEach(f => { if (f.url_pdf) fuentesMap[f.nombre_norma] = f.url_pdf; });
+    consultarResp.innerHTML = markdownLeve(data.respuesta || 'Sin respuesta.', fuentesMap);
+
+    (data.fuentes || []).forEach(f => {
+      const item = document.createElement('div');
+      item.className = 'fuente-item';
+      item.innerHTML = `
+        <span class="fuente-sim">${f.similitud}%</span>
+        <div>
+          <div class="fuente-nombre">${f.nombre_norma}</div>
+          <div class="fuente-tipo">${f.tipo_norma}</div>
+        </div>`;
+      item.addEventListener('click', () => {
+        const p = puntos.find(pt => pt.nombre === f.nombre_norma);
+        if (p) { abrirPanel(p); const idx = puntos.indexOf(p); if (idx !== -1) focusNodo(meshes[idx]); }
+        else if (f.url_pdf) window.open(f.url_pdf, '_blank');
+      });
+      consultarFuentes.appendChild(item);
+    });
+  } catch(e) {
+    consultarLoad.classList.remove('visible');
+    consultarResp.textContent = `Error: ${e.message}. Verificá que el servidor esté corriendo.`;
+  }
+}
+
+// ── Disparadores ──────────────────────────────────────────────
+function ejecutarBusqueda() {
+  const q = inputBuscar.value.trim();
+  if (!q) return;
+  if (modoActual === 'recuperar') buscarSemantico(q);
+  else buscarConsultar(q);
+}
+
+document.getElementById('btn-buscar-action').addEventListener('click', ejecutarBusqueda);
+
+inputBuscar.addEventListener('keydown', e => {
+  if (e.key === 'Enter') ejecutarBusqueda();
+  if (e.key === 'Escape') cerrarPanelLateral('buscar');
+});
+
+btnLimpiar.addEventListener('click', () => {
+  inputBuscar.value = '';
+  btnLimpiar.classList.remove('visible');
+  resultadosDiv.classList.remove('visible');
+  consultarPanel.classList.remove('visible');
+  chipsDiv.classList.remove('oculto');
+  inputBuscar.focus();
+});
+
+// Cerrar resultados al hacer clic fuera
+document.addEventListener('click', e => {
+  if (!document.getElementById('buscar-container').contains(e.target)) {
+    resultadosDiv.classList.remove('visible');
+    consultarPanel.classList.remove('visible');
+  }
+});
+
+// ── Atajos de teclado ─────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  // No disparar si el foco está en un input
+  const tag = document.activeElement.tagName;
+  const enInput = tag === 'INPUT' || tag === 'TEXTAREA';
+
+  if (e.key === 'Escape') {
+    cerrarInfo();
+    if (panelAbierto) cerrarPanelLateral(panelAbierto);
+    panelDetalle.classList.remove('abierto');
+    resultadosDiv.classList.remove('visible');
+    return;
+  }
+  if (enInput) return;
+
+  if (e.key === 'b' || e.key === 'B') togglePanelLateral('buscar');
+  if (e.key === 'f' || e.key === 'F') togglePanelLateral('filtro');
+  if (e.key === 'l' || e.key === 'L') togglePanelLateral('leyenda');
+  if (e.key === 'i' || e.key === 'I') {
+    if (infoOverlay.classList.contains('visible')) cerrarInfo();
+    else abrirInfo();
+  }
+});
+
+// ── Raycasting / tooltip ──────────────────────────────────────
+const raycaster = new THREE.Raycaster();
+const mouse     = new THREE.Vector2();
+const tooltip   = document.getElementById('tooltip');
+
+renderer.domElement.addEventListener('mousemove', e => {
+  if (isDragging) { tooltip.style.display = 'none'; return; }
+  mouse.x = (e.clientX/innerWidth)*2 - 1;
+  mouse.y = -(e.clientY/innerHeight)*2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(meshes.filter(m => m.visible));
+  const tipoNuevo = hits.length > 0 ? puntos[hits[0].object.userData.idx].tipo : null;
+
+  if (tipoNuevo !== tipoHover) {
+    // Resetear tipo anterior
+    if (tipoHover !== null) {
+      meshes.forEach((m, i) => {
+        if (puntos[i]?.tipo === tipoHover && !pulsoAnimaciones.some(pa => pa.i === i))
+          resetearNodoPalido(m, i);
+      });
+    }
+    tipoHover = tipoNuevo;
+    // Iluminar tipo nuevo
+    if (tipoHover !== null) {
+      meshes.forEach((m, i) => {
+        if (puntos[i]?.tipo === tipoHover)
+          iluminarNodo(m, i, puntos[i].color, 0.85);
+      });
+    }
+  }
+
+  if (hits.length > 0) {
+    const p = puntos[hits[0].object.userData.idx];
+    document.getElementById('tt-tipo').textContent = p.tipo + (p.anio && p.anio !== 'nan' ? ' · ' + parseInt(p.anio) : '');
+    document.getElementById('tt-nombre').textContent = p.nombre;
+    tooltip.style.display = 'block';
+    tooltip.style.left = (e.clientX + 16) + 'px';
+    tooltip.style.top  = (e.clientY - 10) + 'px';
+    renderer.domElement.style.cursor = 'pointer';
+    Object.entries(etiquetasCluster).forEach(([t, s]) => { s.visible = t === p.tipo; });
+  } else {
+    tooltip.style.display = 'none';
+    renderer.domElement.style.cursor = 'default';
+    Object.values(etiquetasCluster).forEach(s => { s.visible = false; });
+  }
+});
+
+renderer.domElement.addEventListener('click', e => {
+  mouse.x = (e.clientX/innerWidth)*2 - 1;
+  mouse.y = -(e.clientY/innerHeight)*2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(meshes.filter(m => m.visible));
+  if (hits.length > 0) {
+    abrirPanel(puntos[hits[0].object.userData.idx]);
+    focusNodo(hits[0].object);
+  }
+});
+
+// Panel de búsqueda abierto por defecto, en modo Consultar (RAG)
+togglePanelLateral('buscar');
+
+// ── Render loop ───────────────────────────────────────────────
+(function animate() {
+  requestAnimationFrame(animate);
+  // Actualizar pings sonar
+  const now = performance.now();
+  pings = pings.filter(p => {
+    const t = (now - p.t0) / p.dur;
+    if (t >= 1) { pivot.remove(p.sprite); p.mat.dispose(); return false; }
+    p.sprite.scale.setScalar(4 + (p.endScale - 4) * t);
+    p.mat.opacity = 0.9 * (1 - t);
+    return true;
+  });
+
+  // Actualizar pulsos automáticos
+  pulsoAnimaciones = pulsoAnimaciones.filter(pa => {
+    if (!pa.m.visible) return false;
+    if (puntos[pa.i]?.tipo === tipoHover) { resetearNodoPalido(pa.m, pa.i); return false; }
+    const t = (now - pa.t0) / pa.dur;
+    if (t >= 1) { resetearNodoPalido(pa.m, pa.i); return false; }
+    const intensity = Math.sin(t * Math.PI); // curva 0→1→0
+    iluminarNodo(pa.m, pa.i, pa.colorHex, intensity * 1.1);
+    return true;
+  });
+
+  if (focusAnim) {
+    const sp = 0.07;
+    rotX += (focusAnim.rotXTarget - rotX) * sp;
+    rotY += (focusAnim.rotYTarget - rotY) * sp;
+    camera.position.z += (focusAnim.zTarget - camera.position.z) * sp;
+    pivot.rotation.x = rotX;
+    pivot.rotation.y = rotY;
+    if (Math.abs(focusAnim.rotXTarget - rotX) < 0.002 && Math.abs(focusAnim.rotYTarget - rotY) < 0.002) focusAnim = null;
+  } else if (!isDragging) {
+    pivot.rotation.y += 0.0008;
+    rotY = pivot.rotation.y;
+  }
+  renderer.render(scene, camera);
+})();
+</script>
+</body>
+</html>
