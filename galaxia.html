@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
   <title>ALEPH — Visualización Semántica</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -790,9 +791,45 @@ function focusNodo(mesh) {
   };
 }
 
-renderer.domElement.addEventListener('mousedown', e => { isDragging = true; focusAnim = null; prevX = e.clientX; prevY = e.clientY; });
-renderer.domElement.addEventListener('mouseup',   () => isDragging = false);
-renderer.domElement.addEventListener('mousemove', e => {
+renderer.domElement.style.touchAction = 'none';
+
+let activePointers = new Map();
+let pinchStartDist = 0, pinchStartZ = 0;
+
+renderer.domElement.addEventListener('pointerdown', e => {
+  activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  renderer.domElement.setPointerCapture(e.pointerId);
+  if (activePointers.size === 1) {
+    isDragging = true; focusAnim = null; prevX = e.clientX; prevY = e.clientY;
+  } else if (activePointers.size === 2) {
+    isDragging = false;
+    const [a, b] = [...activePointers.values()];
+    pinchStartDist = Math.hypot(a.x - b.x, a.y - b.y);
+    pinchStartZ = camera.position.z;
+  }
+});
+renderer.domElement.addEventListener('pointerup', e => {
+  activePointers.delete(e.pointerId);
+  isDragging = activePointers.size === 1;
+  pinchStartDist = 0;
+});
+renderer.domElement.addEventListener('pointercancel', e => {
+  activePointers.delete(e.pointerId);
+  isDragging = activePointers.size === 1;
+  pinchStartDist = 0;
+});
+renderer.domElement.addEventListener('pointermove', e => {
+  if (!activePointers.has(e.pointerId)) return;
+  activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+  if (activePointers.size === 2) {
+    const [a, b] = [...activePointers.values()];
+    const dist = Math.hypot(a.x - b.x, a.y - b.y);
+    if (pinchStartDist > 0) {
+      camera.position.z = Math.max(40, Math.min(400, pinchStartZ * (pinchStartDist / dist)));
+    }
+    return;
+  }
   if (!isDragging) return;
   rotY += (e.clientX - prevX) * 0.005;
   rotX += (e.clientY - prevY) * 0.005;
