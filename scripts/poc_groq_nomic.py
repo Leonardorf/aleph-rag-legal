@@ -108,7 +108,7 @@ def build_prompt(query, chunks):
     contexto = "\n\n".join(fragmentos)
     total = len(por_norma)
     return (
-        "Sos un asistente legal especializado en normativa registral argentina.\n"
+        "Sos un asistente legal especializado en normativa registral inmobiliaria argentina.\n"
         "Tenés acceso a fragmentos de documentos normativos. Respondé la consulta "
         "basándote ÚNICAMENTE en esos fragmentos.\n"
         f"- Antes de responder, revisá los {total} documentos numerados [DOC 1] a [DOC {total}] "

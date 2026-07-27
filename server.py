@@ -115,7 +115,7 @@ def build_rag_prompt(query: str, chunks: list) -> str:
     contexto = "\n\n".join(fragmentos)
     total_docs = len(por_norma)
     return (
-        "Sos un asistente legal especializado en normativa registral argentina.\n"
+        "Sos un asistente legal especializado en normativa registral inmobiliaria argentina.\n"
         "Tenés acceso a fragmentos de documentos normativos. Respondé la consulta "
         "basándote ÚNICAMENTE en esos fragmentos.\n"
         f"- Antes de responder, revisá las {total_docs} normas a continuación UNA POR UNA "

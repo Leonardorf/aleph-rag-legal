@@ -1,7 +1,7 @@
-# ALEPH — Buscador semántico y RAG sobre un corpus legal
+# ALEPH — Buscador semántico y RAG sobre un corpus de derecho registral inmobiliario
 
 Prototipo de buscador semántico + RAG (retrieval-augmented generation) sobre un corpus de
-normativa registral, inspirado en el proyecto [GINA](https://boa.com.ar). Combina un pipeline
+normativa registral inmobiliaria, inspirado en el proyecto [GINA](https://boa.com.ar). Combina un pipeline
 propio de scraping y embeddings, búsqueda vectorial en Postgres/pgvector, generación asistida
 por IA con citas a la fuente, y una visualización 3D interactiva del corpus completo.
 
@@ -148,7 +148,7 @@ El repo incluye un `render.yaml` (Blueprint) listo para un Web Service con el ba
 ## Estado y aviso
 
 Prototipo experimental, 2026. Pensado como pieza de portfolio para explorar búsqueda semántica,
-RAG y visualización de embeddings sobre un corpus legal chico — no es un producto en producción
+RAG y visualización de embeddings sobre un corpus de derecho registral inmobiliario chico — no es un producto en producción
 ni una herramienta oficial de ningún organismo.
 
 Los datos provienen de fuentes públicas de normativa registral y de derecho inmobiliario. Las
