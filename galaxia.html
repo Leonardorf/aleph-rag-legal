@@ -344,6 +344,14 @@
       backdrop-filter: blur(4px);
     }
     #info-overlay.visible { display: flex; }
+
+    #btn-info.pulso-info {
+      animation: pulsoInfo 0.7s ease-in-out 3;
+    }
+    @keyframes pulsoInfo {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 rgba(201,162,39,0); }
+      50% { transform: scale(1.18); box-shadow: 0 0 10px rgba(201,162,39,0.7); }
+    }
     #info-modal {
       background: rgba(18,10,3,0.98); border: 1px solid rgba(201,162,39,0.18);
       border-radius: 14px; padding: 32px 36px; max-width: 700px; width: 90%;
@@ -1301,7 +1309,17 @@ function abrirInfo() {
     cerrarPanelLateral(panelAbierto);
   }
 }
-function cerrarInfo() { infoOverlay.classList.remove('visible'); }
+let infoInicialPendiente = true; // true hasta que se cierra el Info mostrado al cargar la página
+function cerrarInfo() {
+  infoOverlay.classList.remove('visible');
+  if (infoInicialPendiente) {
+    infoInicialPendiente = false;
+    togglePanelLateral('buscar');
+    const btnInfo = document.getElementById('btn-info');
+    btnInfo.classList.add('pulso-info');
+    btnInfo.addEventListener('animationend', () => btnInfo.classList.remove('pulso-info'), { once: true });
+  }
+}
 
 document.getElementById('btn-info').addEventListener('click', abrirInfo);
 document.getElementById('btn-cerrar-info').addEventListener('click', cerrarInfo);
@@ -1650,8 +1668,8 @@ renderer.domElement.addEventListener('click', e => {
   }
 });
 
-// Panel de búsqueda abierto por defecto, en modo Consultar (RAG)
-togglePanelLateral('buscar');
+// Info mostrado por defecto al cargar; al cerrarlo se abre la búsqueda en modo Consultar (RAG)
+abrirInfo();
 
 // ── Render loop ───────────────────────────────────────────────
 (function animate() {
