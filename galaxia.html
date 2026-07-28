@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
   <title>ALEPH — Visualización Semántica</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='3.5' fill='%23c9a227'/%3E%3Cellipse cx='16' cy='16' rx='14' ry='6' fill='none' stroke='%23c9a227' stroke-width='1.6' opacity='0.65'/%3E%3C/svg%3E" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #060400; color: #ede0c4; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
@@ -417,6 +418,7 @@
   <button class="toolbar-btn" id="btn-buscar-toggle" title="Buscar">&#128269;</button>
   <button class="toolbar-btn" id="btn-filtro" title="Filtros">&#9661;</button>
   <button class="toolbar-btn" id="btn-info"   title="Información">&#9432;</button>
+  <button class="toolbar-btn" id="btn-musica" title="Música ambiental">&#9835;</button>
 </div>
 
 <!-- Legend panel -->
@@ -1324,6 +1326,109 @@ function cerrarInfo() {
 document.getElementById('btn-info').addEventListener('click', abrirInfo);
 document.getElementById('btn-cerrar-info').addEventListener('click', cerrarInfo);
 infoOverlay.addEventListener('click', e => { if (e.target === infoOverlay) cerrarInfo(); });
+
+// ── Música ambiental (generativa, Web Audio API — sin archivos externos) ──
+let audioCtx = null;
+let musicaNodos = null;
+let musicaActiva = false;
+
+function crearRuidoBuffer(ctx) {
+  const buffer = ctx.createBuffer(1, ctx.sampleRate * 4, ctx.sampleRate);
+  const datos = buffer.getChannelData(0);
+  for (let i = 0; i < datos.length; i++) datos[i] = Math.random() * 2 - 1;
+  return buffer;
+}
+
+function iniciarMusica() {
+  audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+  const ctx = audioCtx;
+
+  const master = ctx.createGain();
+  master.gain.value = 0;
+  master.connect(ctx.destination);
+
+  // Acorde abierto y grave (quintas/octavas), como un drone espacial
+  const frecuencias = [55, 82.4, 110, 164.8];
+  const filtro = ctx.createBiquadFilter();
+  filtro.type = 'lowpass';
+  filtro.frequency.value = 800;
+  filtro.connect(master);
+
+  const panner = ctx.createStereoPanner();
+  panner.connect(filtro);
+
+  const osciladores = frecuencias.map((freq, i) => {
+    const osc = ctx.createOscillator();
+    osc.type = i % 2 === 0 ? 'sine' : 'triangle';
+    osc.frequency.value = freq;
+    osc.detune.value = (Math.random() - 0.5) * 6;
+    const gain = ctx.createGain();
+    gain.gain.value = 0.18 / frecuencias.length;
+    osc.connect(gain).connect(panner);
+    osc.start();
+    return osc;
+  });
+
+  // LFOs lentos: "respiración" del filtro y paneo orbital
+  const lfoFiltro = ctx.createOscillator();
+  lfoFiltro.type = 'sine';
+  lfoFiltro.frequency.value = 0.04;
+  const lfoFiltroGain = ctx.createGain();
+  lfoFiltroGain.gain.value = 400;
+  lfoFiltro.connect(lfoFiltroGain).connect(filtro.frequency);
+  lfoFiltro.start();
+
+  const lfoPan = ctx.createOscillator();
+  lfoPan.type = 'sine';
+  lfoPan.frequency.value = 0.025;
+  const lfoPanGain = ctx.createGain();
+  lfoPanGain.gain.value = 0.7;
+  lfoPan.connect(lfoPanGain).connect(panner.pan);
+  lfoPan.start();
+
+  // Textura de ruido filtrado, muy suave, como "viento estelar"
+  const ruido = ctx.createBufferSource();
+  ruido.buffer = crearRuidoBuffer(ctx);
+  ruido.loop = true;
+  const ruidoFiltro = ctx.createBiquadFilter();
+  ruidoFiltro.type = 'bandpass';
+  ruidoFiltro.frequency.value = 1200;
+  ruidoFiltro.Q.value = 0.6;
+  const ruidoGain = ctx.createGain();
+  ruidoGain.gain.value = 0.015;
+  ruido.connect(ruidoFiltro).connect(ruidoGain).connect(master);
+  ruido.start();
+
+  master.gain.linearRampToValueAtTime(0.14, ctx.currentTime + 2.5);
+
+  musicaNodos = { master, osciladores, lfoFiltro, lfoPan, ruido };
+}
+
+function detenerMusica() {
+  if (!musicaNodos || !audioCtx) return;
+  const ctx = audioCtx;
+  const { master, osciladores, lfoFiltro, lfoPan, ruido } = musicaNodos;
+  master.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.5);
+  setTimeout(() => {
+    osciladores.forEach(o => o.stop());
+    lfoFiltro.stop();
+    lfoPan.stop();
+    ruido.stop();
+  }, 1600);
+  musicaNodos = null;
+}
+
+const btnMusica = document.getElementById('btn-musica');
+btnMusica.addEventListener('click', () => {
+  musicaActiva = !musicaActiva;
+  btnMusica.classList.toggle('active', musicaActiva);
+  if (musicaActiva) {
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    iniciarMusica();
+  } else {
+    detenerMusica();
+  }
+});
 
 // ── Buscador con resultados ──────────────────────────────────
 const inputBuscar   = document.getElementById('input-buscar');
