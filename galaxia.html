@@ -1347,11 +1347,11 @@ function iniciarMusica() {
   master.gain.value = 0;
   master.connect(ctx.destination);
 
-  // Acorde abierto y grave (quintas/octavas), como un drone espacial
-  const frecuencias = [55, 82.4, 110, 164.8];
+  // Acorde abierto (quintas/octavas), como un drone espacial — rango audible en parlantes chicos
+  const frecuencias = [110, 164.8, 220, 329.6];
   const filtro = ctx.createBiquadFilter();
   filtro.type = 'lowpass';
-  filtro.frequency.value = 800;
+  filtro.frequency.value = 1600;
   filtro.connect(master);
 
   const panner = ctx.createStereoPanner();
@@ -1363,7 +1363,7 @@ function iniciarMusica() {
     osc.frequency.value = freq;
     osc.detune.value = (Math.random() - 0.5) * 6;
     const gain = ctx.createGain();
-    gain.gain.value = 0.18 / frecuencias.length;
+    gain.gain.value = 0.3 / frecuencias.length;
     osc.connect(gain).connect(panner);
     osc.start();
     return osc;
@@ -1374,7 +1374,7 @@ function iniciarMusica() {
   lfoFiltro.type = 'sine';
   lfoFiltro.frequency.value = 0.04;
   const lfoFiltroGain = ctx.createGain();
-  lfoFiltroGain.gain.value = 400;
+  lfoFiltroGain.gain.value = 700;
   lfoFiltro.connect(lfoFiltroGain).connect(filtro.frequency);
   lfoFiltro.start();
 
@@ -1395,11 +1395,12 @@ function iniciarMusica() {
   ruidoFiltro.frequency.value = 1200;
   ruidoFiltro.Q.value = 0.6;
   const ruidoGain = ctx.createGain();
-  ruidoGain.gain.value = 0.015;
+  ruidoGain.gain.value = 0.02;
   ruido.connect(ruidoFiltro).connect(ruidoGain).connect(master);
   ruido.start();
 
-  master.gain.linearRampToValueAtTime(0.14, ctx.currentTime + 2.5);
+  master.gain.setValueAtTime(0, ctx.currentTime);
+  master.gain.linearRampToValueAtTime(0.26, ctx.currentTime + 2.5);
 
   musicaNodos = { master, osciladores, lfoFiltro, lfoPan, ruido };
 }
