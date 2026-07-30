@@ -35,10 +35,9 @@ todo a la vez.
 | Herramienta | Rol en el proyecto |
 |---|---|
 | **EasyOCR** | OCR de respaldo para PDFs sin texto digital (escaneados) — sin esto, esas normas quedarían directamente fuera del corpus. |
-| **OpenAI** | Genera los embeddings de nivel-documento (`02_embeddings.py`) que alimentan la recuperación semántica simple (`/api/buscar`, tabla `normas_drp`). |
 | **UMAP** | Reduce los embeddings de cientos de dimensiones a solo 3, preservando qué tan parecidas son las normas entre sí — arma las coordenadas de cada estrella en la galaxia. |
 | **Supabase** | Postgres gestionado + extensión pgvector: guarda los embeddings y resuelve la búsqueda por similitud coseno vía funciones RPC, sin necesitar un motor de vectores aparte. |
-| **Ollama** *(backend `local`)* | Corre `nomic-embed-text` y `llama3.2:3b` en la propia máquina — gratis y sin límite, requiere GPU/CPU propia. |
+| **Ollama** | Genera los embeddings de nivel-documento (`02_embeddings.py`, offline) con `nomic-embed-text`, 100% local; en el backend `local` también corre la generación (`llama3.2:3b`) en la propia máquina — gratis y sin límite, requiere GPU/CPU propia. |
 | **Nomic** *(backend `cloud`)* | Reemplaza a Ollama para el embedding de la consulta — misma familia de modelo, hosteada, así los vectores siguen siendo compatibles con los ya cargados en Supabase sin re-embeber el corpus. |
 | **Groq** *(backend `cloud`)* | Reemplaza a Ollama para la generación — modelos Llama sobre hardware propio (LPU), mucho más rápido que CPU local. |
 
@@ -80,7 +79,7 @@ scraping → texto completo (OCR si hace falta) → embeddings → Postgres/pgve
 |---|---|
 | `01_scraper.py` | Descarga los PDFs de la fuente configurada, clasifica tipo/número/año y arma `data/normas_raw.csv`. |
 | `01b_ocr_easyocr.py` | OCR de respaldo (EasyOCR) para PDFs escaneados sin texto digital. |
-| `02_embeddings.py` | Genera embeddings de nivel-documento (OpenAI) → `data/normas_vectors.json`. |
+| `02_embeddings.py` | Genera embeddings de nivel-documento (Ollama, local) → `data/normas_vectors.json`. |
 | `03_cargar_supabase.py` | Sube esos vectores a Supabase (tabla `normas_drp`, pgvector). |
 | `04_buscar.py` | Buscador de prueba por consola, online (Supabase) u offline (JSON local). |
 | `05_ocr_textos.py` | Extrae el texto completo de cada PDF → `data/textos_completos/*.txt`. |

@@ -400,6 +400,78 @@
     .glosario-def { font-size: 12px; color: rgba(237,224,196,0.75); line-height: 1.6; margin: 0 0 6px; }
     .glosario-porque { font-size: 12px; color: rgba(237,224,196,0.55); line-height: 1.6; margin: 0; }
     .glosario-porque strong { color: rgba(237,224,196,0.8); font-weight: 600; }
+
+    /* ── Diagramas del panel "Cómo funciona por dentro" ── */
+    .diag-subtitulo-1 { font-size: 12px; font-weight: 600; color: rgba(237,224,196,0.7); margin: 0 0 8px; }
+    .diag-flow { display: flex; flex-wrap: wrap; align-items: center; gap: 0; margin-bottom: 4px; }
+    .diag-chip {
+      display: flex; flex-direction: column; gap: 2px;
+      background: rgba(237,224,196,0.04); border: 1px solid rgba(201,162,39,0.3);
+      border-radius: 8px; padding: 7px 10px; min-width: 92px;
+    }
+    .diag-chip.ember { border-color: rgba(194,112,61,0.45); background: rgba(194,112,61,0.08); }
+    .diag-chip .dc-label { font-size: 11.5px; font-weight: 600; color: #ede0c4; line-height: 1.25; }
+    .diag-chip .dc-sub { font-size: 10px; color: rgba(237,224,196,0.5); line-height: 1.25; }
+    .diag-arrow { color: #c9a227; font-size: 13px; opacity: 0.7; padding: 0 6px; flex-shrink: 0; }
+
+    .diag-fork-trunk { display: flex; align-items: center; gap: 8px; margin: 14px 0 2px; }
+    .diag-fork-divider {
+      display: flex; align-items: center; gap: 8px; margin: 10px 0 12px;
+      color: rgba(237,224,196,0.5); font-size: 10.5px;
+    }
+    .diag-fork-divider::before, .diag-fork-divider::after {
+      content: ''; flex: 1; height: 1px; background: rgba(201,162,39,0.18);
+    }
+    .diag-branches { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .diag-branch { border-radius: 8px; padding: 11px 13px; }
+    .diag-branch.recuperar { background: rgba(201,162,39,0.09); border: 1px solid rgba(201,162,39,0.3); }
+    .diag-branch.consultar { background: rgba(194,112,61,0.09); border: 1px solid rgba(194,112,61,0.4); }
+    .diag-branch .db-badge {
+      display: inline-block; font-size: 9px; text-transform: uppercase;
+      letter-spacing: 0.5px; padding: 2px 5px; border-radius: 4px; margin-bottom: 6px;
+    }
+    .diag-branch.recuperar .db-badge { background: rgba(201,162,39,0.2); color: #c9a227; }
+    .diag-branch.consultar .db-badge { background: rgba(194,112,61,0.22); color: #c2703d; }
+    .diag-branch .db-title { font-size: 11.5px; font-weight: 700; margin-bottom: 6px; }
+    .diag-branch.recuperar .db-title { color: #c9a227; }
+    .diag-branch.consultar .db-title { color: #c2703d; }
+    .diag-branch ol { margin: 0; padding-left: 16px; }
+    .diag-branch li { font-size: 11px; color: rgba(237,224,196,0.75); line-height: 1.6; }
+
+    .diag-detalle { margin-top: 16px; }
+    .diag-detalle summary {
+      cursor: pointer; font-size: 12px; font-weight: 600; color: #c9a227;
+      list-style: none; display: flex; align-items: center; gap: 6px; padding: 6px 0;
+    }
+    .diag-detalle summary::-webkit-details-marker { display: none; }
+    .diag-detalle summary::before { content: '\25B8'; font-size: 10px; transition: transform .15s; }
+    .diag-detalle[open] summary::before { transform: rotate(90deg); }
+    .diag-detalle .dd-body { padding: 8px 2px 2px; }
+    .diag-step { display: flex; gap: 12px; position: relative; padding-bottom: 14px; }
+    .diag-step:last-child { padding-bottom: 0; }
+    .diag-step::before {
+      content: ''; position: absolute; left: 10px; top: 22px; bottom: -2px;
+      width: 1px; background: rgba(201,162,39,0.25);
+    }
+    .diag-step:last-child::before { display: none; }
+    .diag-step .ds-num {
+      flex-shrink: 0; width: 21px; height: 21px; border-radius: 50%;
+      background: rgba(201,162,39,0.12); border: 1px solid rgba(201,162,39,0.3);
+      color: #c9a227; font-size: 10px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .diag-step.ember .ds-num { background: rgba(194,112,61,0.14); border-color: rgba(194,112,61,0.4); color: #c2703d; }
+    .diag-step .ds-title { font-size: 12px; font-weight: 600; color: #ede0c4; }
+    .diag-step .ds-desc { font-size: 10.5px; color: rgba(237,224,196,0.55); margin-top: 2px; line-height: 1.5; }
+    .diag-subtitulo {
+      font-size: 11px; font-weight: 700; color: rgba(237,224,196,0.6);
+      text-transform: uppercase; letter-spacing: 0.5px; margin: 14px 0 8px;
+    }
+    .diag-subtitulo:first-child { margin-top: 0; }
+
+    @media (max-width: 520px) {
+      .diag-branches { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -612,16 +684,111 @@
       <p class="glosario-porque"><strong>Por qué lo usamos:</strong> es el criterio que ordena los resultados de búsqueda de más a menos relevante.</p>
     </div>
 
-    <h3>Proceso de Visualización</h3>
-    <p>
-      Cada documento fue procesado con un modelo de embeddings para representarlo como vector en un espacio de alta dimensión,
-      capturando su contenido semántico. Mediante UMAP se redujeron a 3 dimensiones preservando la estructura semántica.
-      La distancia entre estrellas refleja cuán similares son los documentos en contenido y temática.
+    <h3>Cómo funciona por dentro</h3>
+    <p style="margin-bottom:12px;">
+      Cada norma se procesa una sola vez para armar la galaxia. Cada consulta, en cambio,
+      se procesa en el momento — de una de estas dos formas:
     </p>
-    <p>
-      La búsqueda semántica (RAG) recupera los documentos más similares a la consulta sin depender de coincidencias exactas de palabras clave.
-      El sistema utiliza únicamente modelos de recuperación (no generativos) para garantizar resultados precisos y auditables.
-    </p>
+
+    <div class="diag-subtitulo-1">De un PDF a una estrella</div>
+    <div class="diag-flow">
+      <div class="diag-chip"><div class="dc-label">Scraping</div><div class="dc-sub">PDFs oficiales</div></div>
+      <span class="diag-arrow">&#10230;</span>
+      <div class="diag-chip"><div class="dc-label">OCR de respaldo</div><div class="dc-sub">PDFs escaneados</div></div>
+      <span class="diag-arrow">&#10230;</span>
+      <div class="diag-chip"><div class="dc-label">Embeddings</div><div class="dc-sub">vector por norma</div></div>
+      <span class="diag-arrow">&#10230;</span>
+      <div class="diag-chip"><div class="dc-label">UMAP 3D</div><div class="dc-sub">reduce a x, y, z</div></div>
+      <span class="diag-arrow">&#10230;</span>
+      <div class="diag-chip"><div class="dc-label">Estrella</div><div class="dc-sub">posición = significado</div></div>
+    </div>
+
+    <div class="diag-subtitulo-1" style="margin-top:16px;">Un mismo punto de partida, dos caminos</div>
+    <div class="diag-fork-trunk">
+      <div class="diag-chip"><div class="dc-label">Tu consulta</div><div class="dc-sub">lenguaje natural</div></div>
+      <span class="diag-arrow">&#10230;</span>
+      <div class="diag-chip"><div class="dc-label">Embedding</div><div class="dc-sub">de la consulta</div></div>
+    </div>
+    <div class="diag-fork-divider">se bifurca según el modo elegido</div>
+    <div class="diag-branches">
+      <div class="diag-branch recuperar">
+        <div class="db-badge">No genera texto</div>
+        <div class="db-title">Recuperar</div>
+        <ol>
+          <li>Similitud coseno contra el embedding de cada norma</li>
+          <li>Ranking de normas por parecido</li>
+          <li>Se muestran los fragmentos reales, tal cual están escritos</li>
+        </ol>
+      </div>
+      <div class="diag-branch consultar">
+        <div class="db-badge">Genera texto (IA)</div>
+        <div class="db-title">Consultar (RAG)</div>
+        <ol>
+          <li>Similitud coseno contra fragmentos (chunks) de texto</li>
+          <li>Un LLM lee esos fragmentos y redacta una respuesta</li>
+          <li>Responde citando cada norma usada entre corchetes</li>
+        </ol>
+      </div>
+    </div>
+
+    <details class="diag-detalle">
+      <summary>Ver el detalle paso a paso</summary>
+      <div class="dd-body">
+        <div class="diag-subtitulo">Cómo se arma la galaxia</div>
+        <div class="diag-step">
+          <div class="ds-num">1</div>
+          <div><div class="ds-title">Scraping del portal oficial</div>
+          <div class="ds-desc">Descarga los PDFs de Leyes, Decretos, Resoluciones, OSC, OSA, Dictámenes, DTR y Acordadas.</div></div>
+        </div>
+        <div class="diag-step">
+          <div class="ds-num">2</div>
+          <div><div class="ds-title">OCR de respaldo</div>
+          <div class="ds-desc">Los PDFs escaneados sin texto digital pasan por reconocimiento óptico, para no perderlos del corpus.</div></div>
+        </div>
+        <div class="diag-step">
+          <div class="ds-num">3</div>
+          <div><div class="ds-title">Embeddings por norma</div>
+          <div class="ds-desc">Un modelo local (Ollama) convierte el nombre y la descripción de cada norma en un vector que captura su significado.</div></div>
+        </div>
+        <div class="diag-step">
+          <div class="ds-num">4</div>
+          <div><div class="ds-title">Reducción con UMAP</div>
+          <div class="ds-desc">Ese vector de cientos de dimensiones se reduce a solo 3, conservando qué tan parecidas son las normas entre sí.</div></div>
+        </div>
+        <div class="diag-step">
+          <div class="ds-num">5</div>
+          <div><div class="ds-title">Una estrella en el mapa</div>
+          <div class="ds-desc">Esas 3 coordenadas son la posición de la norma en la galaxia — cerca de las que comparten significado.</div></div>
+        </div>
+
+        <div class="diag-subtitulo">Consultar — respuesta con RAG</div>
+        <div class="diag-step">
+          <div class="ds-num">1</div>
+          <div><div class="ds-title">Escribís tu consulta</div>
+          <div class="ds-desc">En lenguaje natural, como le preguntarías a un colega — no hace falta el número de la norma.</div></div>
+        </div>
+        <div class="diag-step">
+          <div class="ds-num">2</div>
+          <div><div class="ds-title">Se embebe la consulta</div>
+          <div class="ds-desc">Con el mismo modelo que embebió el corpus, para que sean comparables.</div></div>
+        </div>
+        <div class="diag-step">
+          <div class="ds-num">3</div>
+          <div><div class="ds-title">Recupera los fragmentos más relevantes</div>
+          <div class="ds-desc">Busca por similitud contra los fragmentos de texto real de las normas (no las normas enteras).</div></div>
+        </div>
+        <div class="diag-step ember">
+          <div class="ds-num">4</div>
+          <div><div class="ds-title">El modelo de IA redacta la respuesta</div>
+          <div class="ds-desc">Lee solo esos fragmentos y arma una respuesta — tiene prohibido usar lo que "sabe" de memoria.</div></div>
+        </div>
+        <div class="diag-step">
+          <div class="ds-num">5</div>
+          <div><div class="ds-title">Respuesta con fuente citada</div>
+          <div class="ds-desc">Cada norma usada aparece nombrada, verificable contra el PDF oficial.</div></div>
+        </div>
+      </div>
+    </details>
 
     <h3>Controles</h3>
     <ul>
