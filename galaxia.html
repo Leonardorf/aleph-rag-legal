@@ -1357,16 +1357,29 @@ function iniciarMusica() {
   const panner = ctx.createStereoPanner();
   panner.connect(filtro);
 
+  // Cada nota tiene su propio tremolo (LFO de volumen) — se nota el "movimiento"
+  // incluso en un parlante mono, a diferencia del paneo estéreo.
   const osciladores = frecuencias.map((freq, i) => {
     const osc = ctx.createOscillator();
     osc.type = i % 2 === 0 ? 'sine' : 'triangle';
     osc.frequency.value = freq;
     osc.detune.value = (Math.random() - 0.5) * 6;
+
+    const baseGain = 0.3 / frecuencias.length;
     const gain = ctx.createGain();
-    gain.gain.value = 0.3 / frecuencias.length;
+    gain.gain.value = baseGain * 0.65;
+
+    const tremolo = ctx.createOscillator();
+    tremolo.type = 'sine';
+    tremolo.frequency.value = 0.05 + i * 0.021; // desfasadas entre sí, para que no "respiren" todas juntas
+    const tremoloGain = ctx.createGain();
+    tremoloGain.gain.value = baseGain * 0.35;
+    tremolo.connect(tremoloGain).connect(gain.gain);
+    tremolo.start();
+
     osc.connect(gain).connect(panner);
     osc.start();
-    return osc;
+    return { osc, tremolo };
   });
 
   // LFOs lentos: "respiración" del filtro y paneo orbital
@@ -1386,35 +1399,44 @@ function iniciarMusica() {
   lfoPan.connect(lfoPanGain).connect(panner.pan);
   lfoPan.start();
 
-  // Textura de ruido filtrado, muy suave, como "viento estelar"
+  // Textura de ruido filtrado, de fondo — modulada en frecuencia para que no suene
+  // a estática fija, y bien por debajo del volumen de las notas.
   const ruido = ctx.createBufferSource();
   ruido.buffer = crearRuidoBuffer(ctx);
   ruido.loop = true;
   const ruidoFiltro = ctx.createBiquadFilter();
   ruidoFiltro.type = 'bandpass';
-  ruidoFiltro.frequency.value = 1200;
-  ruidoFiltro.Q.value = 0.6;
+  ruidoFiltro.frequency.value = 1000;
+  ruidoFiltro.Q.value = 1.2;
+  const ruidoLfo = ctx.createOscillator();
+  ruidoLfo.type = 'sine';
+  ruidoLfo.frequency.value = 0.03;
+  const ruidoLfoGain = ctx.createGain();
+  ruidoLfoGain.gain.value = 500;
+  ruidoLfo.connect(ruidoLfoGain).connect(ruidoFiltro.frequency);
+  ruidoLfo.start();
   const ruidoGain = ctx.createGain();
-  ruidoGain.gain.value = 0.02;
+  ruidoGain.gain.value = 0.006;
   ruido.connect(ruidoFiltro).connect(ruidoGain).connect(master);
   ruido.start();
 
   master.gain.setValueAtTime(0, ctx.currentTime);
   master.gain.linearRampToValueAtTime(0.26, ctx.currentTime + 2.5);
 
-  musicaNodos = { master, osciladores, lfoFiltro, lfoPan, ruido };
+  musicaNodos = { master, osciladores, lfoFiltro, lfoPan, ruido, ruidoLfo };
 }
 
 function detenerMusica() {
   if (!musicaNodos || !audioCtx) return;
   const ctx = audioCtx;
-  const { master, osciladores, lfoFiltro, lfoPan, ruido } = musicaNodos;
+  const { master, osciladores, lfoFiltro, lfoPan, ruido, ruidoLfo } = musicaNodos;
   master.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.5);
   setTimeout(() => {
-    osciladores.forEach(o => o.stop());
+    osciladores.forEach(({ osc, tremolo }) => { osc.stop(); tremolo.stop(); });
     lfoFiltro.stop();
     lfoPan.stop();
     ruido.stop();
+    ruidoLfo.stop();
   }, 1600);
   musicaNodos = null;
 }
