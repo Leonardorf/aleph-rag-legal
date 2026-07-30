@@ -5,6 +5,10 @@ normativa registral inmobiliaria, inspirado en el proyecto [GINA](https://boa.co
 propio de scraping y embeddings, búsqueda vectorial en Postgres/pgvector, generación asistida
 por IA con citas a la fuente, y una visualización 3D interactiva del corpus completo.
 
+Todos los documentos son **datos públicos**, extraídos automáticamente de un portal de
+normativa provincial — no se procesa ni almacena información confidencial ni de acceso
+restringido.
+
 ![Galaxia 3D de normas con el panel de consulta abierto](screencapture.png)
 
 ## Demo en vivo
@@ -177,7 +181,8 @@ Prototipo experimental, 2026. Pensado como pieza de portfolio para explorar bús
 RAG y visualización de embeddings sobre un corpus de derecho registral inmobiliario chico — no es un producto en producción
 ni una herramienta oficial de ningún organismo.
 
-Los datos provienen de fuentes públicas de normativa registral y de derecho inmobiliario. Las
-respuestas generadas por el modelo de IA (RAG) son un resumen orientativo a partir de fragmentos
-de las normas — pueden omitir matices o contener imprecisiones, y no reemplazan la lectura del
+Los datos provienen de fuentes públicas de normativa registral y de derecho inmobiliario —
+no se procesa ni almacena información confidencial ni de acceso restringido. Las respuestas
+generadas por el modelo de IA (RAG) son un resumen orientativo a partir de fragmentos de las
+normas — pueden omitir matices o contener imprecisiones, y no reemplazan la lectura del
 texto completo de la norma citada ni el asesoramiento legal profesional.
