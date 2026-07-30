@@ -59,6 +59,33 @@ todo a la vez.
     desplegar en un hosting sin GPU (Render, etc.) sin tener que re-generar el corpus, porque
     Nomic sirve el mismo modelo de embeddings que corre localmente con Ollama.
 
+## Cómo funciona
+
+**De un PDF a una estrella** — cada norma se procesa una sola vez para armar la galaxia:
+
+```mermaid
+flowchart LR
+    A[Scraping<br/>PDFs oficiales] --> B[OCR de respaldo<br/>PDFs escaneados]
+    B --> C[Embeddings<br/>vector por norma]
+    C --> D[UMAP 3D<br/>reduce a x, y, z]
+    D --> E[Estrella<br/>posición = significado]
+```
+
+**Un mismo punto de partida, dos caminos** — cada consulta se procesa en el momento, de una
+de estas dos formas:
+
+```mermaid
+flowchart TD
+    Q[Tu consulta] --> EMB[Embedding de la consulta]
+    EMB --> R["Recuperar<br/>(no genera texto)"]
+    EMB --> C["Consultar / RAG<br/>(genera texto con IA)"]
+    R --> R1[Similitud coseno vs. embedding de cada norma]
+    R1 --> R2[Ranking de normas por parecido]
+    C --> C1[Similitud coseno vs. chunks de texto]
+    C1 --> C2[Un LLM lee los fragmentos y redacta la respuesta]
+    C2 --> C3[Responde citando cada norma entre corchetes]
+```
+
 ## Arquitectura
 
 ```
