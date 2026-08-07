@@ -13,10 +13,20 @@ jobs:
     steps:
       - name: Consultar la API REST de Supabase
         run: |
-          curl -sf -o /dev/null -w "HTTP %{http_code}\n" \
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
+            echo "Falta SUPABASE_URL o SUPABASE_KEY (secret vacío o no configurado)."
+            exit 1
+          fi
+          status=$(curl -s -o body.json -w "%{http_code}" \
             "${SUPABASE_URL}/rest/v1/normas_drp?select=id&limit=1" \
             -H "apikey: ${SUPABASE_KEY}" \
-            -H "Authorization: Bearer ${SUPABASE_KEY}"
+            -H "Authorization: Bearer ${SUPABASE_KEY}")
+          echo "HTTP $status"
+          cat body.json
+          echo
+          if [ "$status" -ge 400 ]; then
+            exit 1
+          fi
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
