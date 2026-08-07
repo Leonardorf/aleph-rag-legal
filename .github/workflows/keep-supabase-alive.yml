@@ -1,0 +1,22 @@
+name: Keep Supabase alive
+
+on:
+  schedule:
+    # Lunes y jueves a las 12:00 UTC — el plan free de Supabase pausa el proyecto
+    # tras 7 días sin actividad en la API, así que dos pings por semana alcanzan de sobra.
+    - cron: '0 12 * * 1,4'
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Consultar la API REST de Supabase
+        run: |
+          curl -sf -o /dev/null -w "HTTP %{http_code}\n" \
+            "${SUPABASE_URL}/rest/v1/normas_drp?select=id&limit=1" \
+            -H "apikey: ${SUPABASE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_KEY}"
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
