@@ -16,7 +16,7 @@
       padding: 18px 24px; z-index: 50;
     }
     #header h1 { font-size: 20px; font-weight: 700; color: #f5e6c0; letter-spacing: 1.5px; }
-    #header p  { font-size: 11px; color: rgba(237,224,196,0.35); margin-top: 3px; }
+    #header p  { font-size: 12px; color: rgba(237,224,196,0.35); margin-top: 3px; }
 
     /* ── Bottom pill toolbar ── */
     #toolbar {
@@ -327,13 +327,13 @@
     /* ── Controls hint ── */
     #controles {
       position: fixed; bottom: 16px; right: 18px;
-      font-size: 10px; opacity: .2; text-align: right; line-height: 1.9; z-index: 50;
+      font-size: 12px; opacity: .2; text-align: right; line-height: 1.9; z-index: 50;
     }
 
     /* ── Disclaimer footer ── */
     #disclaimer {
       position: fixed; bottom: 12px; left: 18px;
-      font-size: 10px; color: rgba(255,255,255,0.22);
+      font-size: 12px; color: rgba(255,255,255,0.22);
       line-height: 1.6; z-index: 50; pointer-events: none;
       max-width: 420px;
     }
@@ -838,7 +838,7 @@
     <div class="modal-disclaimer" style="margin-top:24px;">
       <p>
         Prototipo experimental, 2026, para explorar búsqueda semántica, RAG y visualización de
-        embeddings sobre un corpus legal chico — no es un producto en producción ni una
+        embeddings sobre un corpus legal pequeño — no es un producto en producción ni una
         herramienta oficial de ningún organismo.
       </p>
       <p>
@@ -849,8 +849,16 @@
       </p>
     </div>
 
-    <p style="margin-top:16px; font-size:11px; color:rgba(255,255,255,0.3); text-align:right;">
-      Desarrollado por Ing. Leonardo Villegas ·
+    <p id="info-credito" style="margin-top:16px; font-size:13px; color:rgba(255,255,255,0.4); text-align:right;">
+      Desarrollado por
+      <a href="mailto:leonfevi@gmail.com"
+         style="color:rgba(201,162,39,0.7); text-decoration:none; border-bottom:1px dotted rgba(201,162,39,0.4);">
+        Ing. Leonardo Villegas
+      </a> ·
+      <a href="https://ar.linkedin.com/in/leonardo-r-f-villegas" target="_blank" rel="noopener noreferrer"
+         style="color:rgba(201,162,39,0.7); text-decoration:none; border-bottom:1px dotted rgba(201,162,39,0.4);">
+        LinkedIn
+      </a> ·
       <a href="https://github.com/Leonardorf/aleph-rag-legal" target="_blank" rel="noopener noreferrer"
          style="color:rgba(201,162,39,0.7); text-decoration:none; border-bottom:1px dotted rgba(201,162,39,0.4);">
         código en GitHub
@@ -862,7 +870,10 @@
 
 <!-- Controls -->
 <div id="controles">
-  Arrastrar — rotar<br>Scroll — zoom<br>Click — detalle
+  Arrastrar — rotar<br>Scroll — zoom<br>Click — detalle<br>
+  <a id="credito-mini" href="#" style="color:inherit; text-decoration:none; border-bottom:1px dotted rgba(255,255,255,0.4); cursor:pointer;">
+    Desarrollado por Ing. Leonardo Villegas
+  </a>
 </div>
 
 <!-- Disclaimer -->
@@ -1494,6 +1505,14 @@ function cerrarInfo() {
 
 document.getElementById('btn-info').addEventListener('click', abrirInfo);
 document.getElementById('btn-cerrar-info').addEventListener('click', cerrarInfo);
+
+document.getElementById('credito-mini').addEventListener('click', (e) => {
+  e.preventDefault();
+  abrirInfo();
+  requestAnimationFrame(() => {
+    document.getElementById('info-credito').scrollIntoView({ behavior: 'smooth', block: 'end' });
+  });
+});
 infoOverlay.addEventListener('click', e => { if (e.target === infoOverlay) cerrarInfo(); });
 
 // ── Música ambiental (generativa, Web Audio API — sin archivos externos) ──
