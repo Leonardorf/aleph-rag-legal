@@ -1547,6 +1547,11 @@ function iniciarMusica() {
 
   // Cada nota tiene su propio tremolo (LFO de volumen) — se nota el "movimiento"
   // incluso en un parlante mono, a diferencia del paneo estéreo.
+  // Cada nota también suma una capa una octava arriba (freq*2): en parlantes chicos
+  // los graves de la fundamental casi no se reproducen, y sin esa capa lo único que
+  // queda audible es el ruido de fondo, que entonces se percibe como "ruido blanco"
+  // en vez de un acorde. La octava sigue siendo armónica (no agrega ruido), y cae en
+  // un rango que los parlantes chicos sí reproducen bien.
   const osciladores = frecuencias.map((freq, i) => {
     const osc = ctx.createOscillator();
     osc.type = i % 2 === 0 ? 'sine' : 'triangle';
@@ -1557,17 +1562,29 @@ function iniciarMusica() {
     const gain = ctx.createGain();
     gain.gain.value = baseGain * 0.65;
 
+    const oscOctava = ctx.createOscillator();
+    oscOctava.type = 'sine';
+    oscOctava.frequency.value = freq * 2;
+    oscOctava.detune.value = (Math.random() - 0.5) * 6;
+    const gainOctava = ctx.createGain();
+    gainOctava.gain.value = baseGain * 0.55;
+
     const tremolo = ctx.createOscillator();
     tremolo.type = 'sine';
     tremolo.frequency.value = 0.05 + i * 0.021; // desfasadas entre sí, para que no "respiren" todas juntas
     const tremoloGain = ctx.createGain();
     tremoloGain.gain.value = baseGain * 0.35;
     tremolo.connect(tremoloGain).connect(gain.gain);
+    const tremoloGainOctava = ctx.createGain();
+    tremoloGainOctava.gain.value = baseGain * 0.3;
+    tremolo.connect(tremoloGainOctava).connect(gainOctava.gain);
     tremolo.start();
 
     osc.connect(gain).connect(panner);
+    oscOctava.connect(gainOctava).connect(panner);
     osc.start();
-    return { osc, tremolo };
+    oscOctava.start();
+    return { osc, oscOctava, tremolo };
   });
 
   // LFOs lentos: "respiración" del filtro y paneo orbital
@@ -1581,9 +1598,9 @@ function iniciarMusica() {
 
   const lfoPan = ctx.createOscillator();
   lfoPan.type = 'sine';
-  lfoPan.frequency.value = 0.025;
+  lfoPan.frequency.value = 0.06; // ciclo de ~17s, más notorio que el original de ~40s
   const lfoPanGain = ctx.createGain();
-  lfoPanGain.gain.value = 0.7;
+  lfoPanGain.gain.value = 0.9;
   lfoPan.connect(lfoPanGain).connect(panner.pan);
   lfoPan.start();
 
@@ -1594,8 +1611,8 @@ function iniciarMusica() {
   ruido.loop = true;
   const ruidoFiltro = ctx.createBiquadFilter();
   ruidoFiltro.type = 'bandpass';
-  ruidoFiltro.frequency.value = 1000;
-  ruidoFiltro.Q.value = 1.2;
+  ruidoFiltro.frequency.value = 3200;
+  ruidoFiltro.Q.value = 2.8;
   const ruidoLfo = ctx.createOscillator();
   ruidoLfo.type = 'sine';
   ruidoLfo.frequency.value = 0.03;
@@ -1604,7 +1621,7 @@ function iniciarMusica() {
   ruidoLfo.connect(ruidoLfoGain).connect(ruidoFiltro.frequency);
   ruidoLfo.start();
   const ruidoGain = ctx.createGain();
-  ruidoGain.gain.value = 0.006;
+  ruidoGain.gain.value = 0.0025;
   ruido.connect(ruidoFiltro).connect(ruidoGain).connect(master);
   ruido.start();
 
@@ -1620,7 +1637,7 @@ function detenerMusica() {
   const { master, osciladores, lfoFiltro, lfoPan, ruido, ruidoLfo } = musicaNodos;
   master.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.5);
   setTimeout(() => {
-    osciladores.forEach(({ osc, tremolo }) => { osc.stop(); tremolo.stop(); });
+    osciladores.forEach(({ osc, oscOctava, tremolo }) => { osc.stop(); oscOctava.stop(); tremolo.stop(); });
     lfoFiltro.stop();
     lfoPan.stop();
     ruido.stop();
