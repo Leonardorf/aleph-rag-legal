@@ -1520,13 +1520,6 @@ let audioCtx = null;
 let musicaNodos = null;
 let musicaActiva = false;
 
-function crearRuidoBuffer(ctx) {
-  const buffer = ctx.createBuffer(1, ctx.sampleRate * 4, ctx.sampleRate);
-  const datos = buffer.getChannelData(0);
-  for (let i = 0; i < datos.length; i++) datos[i] = Math.random() * 2 - 1;
-  return buffer;
-}
-
 function iniciarMusica() {
   audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
   const ctx = audioCtx;
@@ -1604,44 +1597,21 @@ function iniciarMusica() {
   lfoPan.connect(lfoPanGain).connect(panner.pan);
   lfoPan.start();
 
-  // Textura de ruido filtrado, de fondo — modulada en frecuencia para que no suene
-  // a estática fija, y bien por debajo del volumen de las notas.
-  const ruido = ctx.createBufferSource();
-  ruido.buffer = crearRuidoBuffer(ctx);
-  ruido.loop = true;
-  const ruidoFiltro = ctx.createBiquadFilter();
-  ruidoFiltro.type = 'bandpass';
-  ruidoFiltro.frequency.value = 3200;
-  ruidoFiltro.Q.value = 2.8;
-  const ruidoLfo = ctx.createOscillator();
-  ruidoLfo.type = 'sine';
-  ruidoLfo.frequency.value = 0.03;
-  const ruidoLfoGain = ctx.createGain();
-  ruidoLfoGain.gain.value = 500;
-  ruidoLfo.connect(ruidoLfoGain).connect(ruidoFiltro.frequency);
-  ruidoLfo.start();
-  const ruidoGain = ctx.createGain();
-  ruidoGain.gain.value = 0.0025;
-  ruido.connect(ruidoFiltro).connect(ruidoGain).connect(master);
-  ruido.start();
-
   master.gain.setValueAtTime(0, ctx.currentTime);
   master.gain.linearRampToValueAtTime(0.26, ctx.currentTime + 2.5);
 
-  musicaNodos = { master, osciladores, lfoFiltro, lfoPan, ruido, ruidoLfo };
+  musicaNodos = { master, osciladores, lfoFiltro, lfoPan };
 }
 
 function detenerMusica() {
   if (!musicaNodos || !audioCtx) return;
   const ctx = audioCtx;
-  const { master, osciladores, lfoFiltro, lfoPan, ruido, ruidoLfo } = musicaNodos;
+  const { master, osciladores, lfoFiltro, lfoPan } = musicaNodos;
   master.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.5);
   setTimeout(() => {
     osciladores.forEach(({ osc, oscOctava, tremolo }) => { osc.stop(); oscOctava.stop(); tremolo.stop(); });
     lfoFiltro.stop();
     lfoPan.stop();
-    ruido.stop();
-    ruidoLfo.stop();
   }, 1600);
   musicaNodos = null;
 }
