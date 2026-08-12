@@ -1515,104 +1515,66 @@ document.getElementById('credito-mini').addEventListener('click', (e) => {
 });
 infoOverlay.addEventListener('click', e => { if (e.target === infoOverlay) cerrarInfo(); });
 
-// ── Música ambiental (generativa, Web Audio API — sin archivos externos) ──
+// ── Música ambiental (loop pregrabado, licencia libre — ver static/audio/LICENCIA.txt) ──
 let audioCtx = null;
 let musicaNodos = null;
 let musicaActiva = false;
+let bufferMusicaPromise = null;
 
-function iniciarMusica() {
+function cargarBufferMusica() {
+  if (!bufferMusicaPromise) {
+    bufferMusicaPromise = fetch('/static/audio/ambiente-galaxia.mp3')
+      .then(r => r.arrayBuffer())
+      .then(data => audioCtx.decodeAudioData(data))
+      .then(buffer => suavizarLoop(buffer, 1.2));
+  }
+  return bufferMusicaPromise;
+}
+
+// El archivo no es un loop perfecto: mezcla el final con el comienzo (crossfade
+// de `fade` segundos) para que no se note un click/salto en el punto de unión.
+function suavizarLoop(buffer, fade) {
+  const fadeSamples = Math.min(Math.floor(fade * buffer.sampleRate), Math.floor(buffer.length / 2));
+  const salida = audioCtx.createBuffer(buffer.numberOfChannels, buffer.length, buffer.sampleRate);
+  for (let c = 0; c < buffer.numberOfChannels; c++) {
+    const src = buffer.getChannelData(c);
+    const dst = salida.getChannelData(c);
+    dst.set(src);
+    for (let i = 0; i < fadeSamples; i++) {
+      const t = i / fadeSamples;
+      dst[buffer.length - fadeSamples + i] = src[buffer.length - fadeSamples + i] * (1 - t) + src[i] * t;
+    }
+  }
+  return salida;
+}
+
+async function iniciarMusica() {
   audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
   const ctx = audioCtx;
+  const buffer = await cargarBufferMusica();
+  if (!musicaActiva) return; // se apagó mientras cargaba el audio
+
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  source.loop = true;
 
   const master = ctx.createGain();
   master.gain.value = 0;
-  master.connect(ctx.destination);
-
-  // Acorde abierto (quintas/octavas), como un drone espacial — rango audible en parlantes chicos
-  const frecuencias = [110, 164.8, 220, 329.6];
-  const filtro = ctx.createBiquadFilter();
-  filtro.type = 'lowpass';
-  filtro.frequency.value = 1600;
-  filtro.connect(master);
-
-  const panner = ctx.createStereoPanner();
-  panner.connect(filtro);
-
-  // Cada nota tiene su propio tremolo (LFO de volumen) — se nota el "movimiento"
-  // incluso en un parlante mono, a diferencia del paneo estéreo.
-  // Cada nota también suma una capa una octava arriba (freq*2): en parlantes chicos
-  // los graves de la fundamental casi no se reproducen, y sin esa capa lo único que
-  // queda audible es el ruido de fondo, que entonces se percibe como "ruido blanco"
-  // en vez de un acorde. La octava sigue siendo armónica (no agrega ruido), y cae en
-  // un rango que los parlantes chicos sí reproducen bien.
-  const osciladores = frecuencias.map((freq, i) => {
-    const osc = ctx.createOscillator();
-    osc.type = i % 2 === 0 ? 'sine' : 'triangle';
-    osc.frequency.value = freq;
-    osc.detune.value = (Math.random() - 0.5) * 6;
-
-    const baseGain = 0.3 / frecuencias.length;
-    const gain = ctx.createGain();
-    gain.gain.value = baseGain * 0.65;
-
-    const oscOctava = ctx.createOscillator();
-    oscOctava.type = 'sine';
-    oscOctava.frequency.value = freq * 2;
-    oscOctava.detune.value = (Math.random() - 0.5) * 6;
-    const gainOctava = ctx.createGain();
-    gainOctava.gain.value = baseGain * 0.55;
-
-    const tremolo = ctx.createOscillator();
-    tremolo.type = 'sine';
-    tremolo.frequency.value = 0.05 + i * 0.021; // desfasadas entre sí, para que no "respiren" todas juntas
-    const tremoloGain = ctx.createGain();
-    tremoloGain.gain.value = baseGain * 0.35;
-    tremolo.connect(tremoloGain).connect(gain.gain);
-    const tremoloGainOctava = ctx.createGain();
-    tremoloGainOctava.gain.value = baseGain * 0.3;
-    tremolo.connect(tremoloGainOctava).connect(gainOctava.gain);
-    tremolo.start();
-
-    osc.connect(gain).connect(panner);
-    oscOctava.connect(gainOctava).connect(panner);
-    osc.start();
-    oscOctava.start();
-    return { osc, oscOctava, tremolo };
-  });
-
-  // LFOs lentos: "respiración" del filtro y paneo orbital
-  const lfoFiltro = ctx.createOscillator();
-  lfoFiltro.type = 'sine';
-  lfoFiltro.frequency.value = 0.04;
-  const lfoFiltroGain = ctx.createGain();
-  lfoFiltroGain.gain.value = 700;
-  lfoFiltro.connect(lfoFiltroGain).connect(filtro.frequency);
-  lfoFiltro.start();
-
-  const lfoPan = ctx.createOscillator();
-  lfoPan.type = 'sine';
-  lfoPan.frequency.value = 0.06; // ciclo de ~17s, más notorio que el original de ~40s
-  const lfoPanGain = ctx.createGain();
-  lfoPanGain.gain.value = 0.9;
-  lfoPan.connect(lfoPanGain).connect(panner.pan);
-  lfoPan.start();
+  source.connect(master).connect(ctx.destination);
 
   master.gain.setValueAtTime(0, ctx.currentTime);
-  master.gain.linearRampToValueAtTime(0.26, ctx.currentTime + 2.5);
+  master.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 2.5);
+  source.start();
 
-  musicaNodos = { master, osciladores, lfoFiltro, lfoPan };
+  musicaNodos = { master, source };
 }
 
 function detenerMusica() {
   if (!musicaNodos || !audioCtx) return;
   const ctx = audioCtx;
-  const { master, osciladores, lfoFiltro, lfoPan } = musicaNodos;
+  const { master, source } = musicaNodos;
   master.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.5);
-  setTimeout(() => {
-    osciladores.forEach(({ osc, oscOctava, tremolo }) => { osc.stop(); oscOctava.stop(); tremolo.stop(); });
-    lfoFiltro.stop();
-    lfoPan.stop();
-  }, 1600);
+  setTimeout(() => source.stop(), 1600);
   musicaNodos = null;
 }
 
