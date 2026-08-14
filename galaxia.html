@@ -783,6 +783,11 @@
       <p class="glosario-porque"><strong>Por qué lo usamos:</strong> es lo único que hace posible <em>ver</em> el corpus como un mapa de estrellas — sin esta reducción, cada norma seguiría siendo una lista de números imposible de graficar.</p>
     </div>
     <div class="glosario-item">
+      <div class="glosario-term">Chunk (fragmento)</div>
+      <p class="glosario-def">Cada norma se parte en fragmentos más chicos antes de generar sus embeddings, en vez de tener un solo vector para todo el documento. El corte se puede hacer de varias formas — por artículo, por párrafo, por una cantidad fija de caracteres. Cortar por artículo no siempre es viable: no todos los tipos de norma (Dictámenes, Órdenes de Servicio, Resoluciones) tienen una estructura de artículos numerados consistente.</p>
+      <p class="glosario-porque"><strong>Por qué lo usamos:</strong> un vector de la norma entera "promedia" todo su contenido y pierde precisión si la pregunta apunta a una parte puntual; con fragmentos, la respuesta cita el texto exacto que la responde, en vez de un resumen difuso de todo el documento.</p>
+    </div>
+    <div class="glosario-item">
       <div class="glosario-term">RAG (recuperación + generación)</div>
       <p class="glosario-def">En vez de que el modelo de IA responda de memoria, primero busca los fragmentos de normas más relevantes para la consulta y arma la respuesta solo a partir de ellos.</p>
       <p class="glosario-porque"><strong>Por qué lo usamos:</strong> ancla la respuesta al texto real de la normativa registral inmobiliaria en lugar de a lo que el modelo "cree" saber, reduciendo el riesgo de que invente contenido.</p>
