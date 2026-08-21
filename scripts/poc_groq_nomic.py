@@ -76,7 +76,7 @@ def buscar_chunks(emb, top_k):
     return result.data
 
 
-def groq_completion(prompt, model="llama-3.3-70b-versatile"):
+def groq_completion(prompt, model="openai/gpt-oss-120b"):
     resp = requests.post(
         "https://api.groq.com/openai/v1/chat/completions",
         headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
