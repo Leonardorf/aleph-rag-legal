@@ -192,6 +192,15 @@
       border-top: 1px solid rgba(201,162,39,0.1);
       padding: 10px 0 4px;
     }
+    .btn-tts {
+      display: none; align-items: center; gap: 6px; margin: 0 18px 12px;
+      background: rgba(201,162,39,0.08); border: 1px solid rgba(201,162,39,0.3);
+      color: rgba(237,224,196,0.85); font-size: 12px; padding: 6px 12px;
+      border-radius: 8px; cursor: pointer; transition: background .15s, border-color .15s, color .15s;
+    }
+    .btn-tts.visible { display: inline-flex; }
+    .btn-tts:hover { background: rgba(201,162,39,0.18); border-color: rgba(201,162,39,0.6); color: #c9a227; }
+    .btn-tts.hablando { color: #c9a227; border-color: rgba(201,162,39,0.6); background: rgba(201,162,39,0.18); }
     .fuentes-titulo {
       font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px;
       color: rgba(201,162,39,0.5); padding: 0 18px 8px;
@@ -529,6 +538,7 @@
       <div class="loading-dots"><span></span><span></span><span></span></div>
     </div>
     <div id="consultar-respuesta"></div>
+    <button id="btn-tts" class="btn-tts">&#128264; Escuchar</button>
     <div id="consultar-fuentes">
       <div class="fuentes-titulo">Fuentes consultadas</div>
     </div>
@@ -1722,6 +1732,7 @@ function setModo(modo) {
   inputBuscar.placeholder = esConsultar ? 'Hacé una pregunta sobre las normas...' : 'Buscar norma...';
   resultadosDiv.classList.remove('visible');
   consultarPanel.classList.remove('visible');
+  detenerTts();
   inputBuscar.value = '';
   btnLimpiar.classList.remove('visible');
   renderChips(modo);
@@ -1816,6 +1827,36 @@ function markdownLeve(txt, fuentesMap = {}) {
   return html;
 }
 
+// ── Leer la respuesta en voz alta (Web Speech API — nativa del navegador) ──
+const btnTts = document.getElementById('btn-tts');
+const ttsSoportado = 'speechSynthesis' in window;
+
+function detenerTts() {
+  if (ttsSoportado) window.speechSynthesis.cancel();
+  btnTts.classList.remove('hablando');
+  btnTts.innerHTML = '&#128264; Escuchar';
+}
+
+function textoPlano(txt) {
+  return txt
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/^#{1,3}\s+/gm, '')
+    .replace(/[[\]]/g, '');
+}
+
+btnTts.addEventListener('click', () => {
+  if (!ttsSoportado) return;
+  if (window.speechSynthesis.speaking) { detenerTts(); return; }
+  const utterance = new SpeechSynthesisUtterance(btnTts.dataset.texto || '');
+  utterance.lang = 'es-AR';
+  utterance.onend = detenerTts;
+  utterance.onerror = detenerTts;
+  btnTts.classList.add('hablando');
+  btnTts.innerHTML = '&#9209; Detener';
+  window.speechSynthesis.speak(utterance);
+});
+
 // ── Consultar (RAG generativo) ────────────────────────────────
 let consultarAbort = null;
 
@@ -1825,6 +1866,8 @@ async function buscarConsultar(q) {
   consultarAbort = new AbortController();
   const señal = consultarAbort.signal;
 
+  detenerTts();
+  btnTts.classList.remove('visible');
   consultarResp.innerHTML = '';
   consultarFuentes.innerHTML = '<div class="fuentes-titulo">Fuentes consultadas</div>';
   consultarLoadTexto.textContent = 'Generando respuesta';
@@ -1859,6 +1902,10 @@ async function buscarConsultar(q) {
     const fuentesMap = {};
     (data.fuentes || []).forEach(f => { if (f.url_pdf) fuentesMap[f.nombre_norma] = f.url_pdf; });
     consultarResp.innerHTML = markdownLeve(data.respuesta || 'Sin respuesta.', fuentesMap);
+    if (ttsSoportado && data.respuesta) {
+      btnTts.dataset.texto = textoPlano(data.respuesta);
+      btnTts.classList.add('visible');
+    }
 
     (data.fuentes || []).forEach(f => {
       const item = document.createElement('div');
@@ -1905,6 +1952,7 @@ btnLimpiar.addEventListener('click', () => {
   btnLimpiar.classList.remove('visible');
   resultadosDiv.classList.remove('visible');
   consultarPanel.classList.remove('visible');
+  detenerTts();
   chipsDiv.classList.remove('oculto');
   inputBuscar.focus();
 });
