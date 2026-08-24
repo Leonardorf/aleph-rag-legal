@@ -165,9 +165,12 @@
       background: rgba(18,10,3,0.98); border: 1px solid rgba(201,162,39,0.18);
       border-radius: 0 0 12px 12px; border-top: none;
       display: none; flex-direction: column; position: relative;
-      max-height: calc(100vh - 140px); overflow-y: auto;
+      max-height: calc(100vh - 140px); overflow: hidden;
     }
     #consultar-panel.visible { display: flex; }
+    #consultar-scroll {
+      overflow-y: auto; min-height: 0;
+    }
     #consultar-respuesta {
       padding: 18px 90px 12px 18px;
       font-size: 13.5px; color: #ede0c4; line-height: 1.75;
@@ -538,10 +541,12 @@
       <span id="consultar-loading-texto">Generando respuesta</span>
       <div class="loading-dots"><span></span><span></span><span></span></div>
     </div>
-    <div id="consultar-respuesta"></div>
     <button id="btn-tts" class="btn-tts">&#128264; Escuchar</button>
-    <div id="consultar-fuentes">
-      <div class="fuentes-titulo">Fuentes consultadas</div>
+    <div id="consultar-scroll">
+      <div id="consultar-respuesta"></div>
+      <div id="consultar-fuentes">
+        <div class="fuentes-titulo">Fuentes consultadas</div>
+      </div>
     </div>
   </div>
 </div>
@@ -1056,6 +1061,7 @@ renderer.domElement.addEventListener('pointermove', e => {
   pivot.rotation.y = rotY; pivot.rotation.x = rotX;
 });
 window.addEventListener('wheel', e => {
+  if (e.target.closest('#buscar-container, #filtro-panel, #leyenda-panel, #panel-detalle, #info-overlay')) return;
   e.preventDefault();
   camera.position.z = Math.max(40, Math.min(400, camera.position.z + e.deltaY * 0.2));
 }, { passive: false });
