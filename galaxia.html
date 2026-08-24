@@ -520,7 +520,7 @@
   <div id="buscar-resultados"></div>
   <div id="consultar-panel">
     <div id="consultar-loading">
-      Generando respuesta
+      <span id="consultar-loading-texto">Generando respuesta</span>
       <div class="loading-dots"><span></span><span></span><span></span></div>
     </div>
     <div id="consultar-respuesta"></div>
@@ -1690,8 +1690,20 @@ function renderChips(modo) {
 
 const consultarPanel  = document.getElementById('consultar-panel');
 const consultarLoad   = document.getElementById('consultar-loading');
+const consultarLoadTexto = document.getElementById('consultar-loading-texto');
 const consultarResp   = document.getElementById('consultar-respuesta');
 const consultarFuentes = document.getElementById('consultar-fuentes');
+
+// ── Reactivar el backend si estuvo dormido (Render free tier lo baja
+//    tras 15 min de inactividad; esto adelanta el cold-start antes de
+//    que el usuario dispare una consulta real) ──────────────────
+function despertarServicio() {
+  fetch('/api/ping').catch(() => {});
+}
+despertarServicio();
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') despertarServicio();
+});
 
 function setModo(modo) {
   modoActual = modo;
@@ -1717,9 +1729,13 @@ async function buscarSemantico(q) {
   if (!q) return;
   resultadosDiv.innerHTML = '<div style="padding:12px;color:rgba(237,224,196,0.4);font-size:12px">Buscando...</div>';
   resultadosDiv.classList.add('visible');
+  const avisoLento = setTimeout(() => {
+    resultadosDiv.innerHTML = '<div style="padding:12px;color:rgba(237,224,196,0.4);font-size:12px">El servicio estaba inactivo, reactivando el servidor... puede tardar hasta 1 minuto.</div>';
+  }, 8000);
   try {
     const top = document.getElementById('buscar-top').value;
     const resp = await fetch(`/api/buscar?q=${encodeURIComponent(q)}&top=${top}`);
+    clearTimeout(avisoLento);
     const data = await resp.json().catch(() => null);
     if (!resp.ok) throw new Error(data?.error || 'servidor no disponible');
     if (data.error) throw new Error(data.error);
@@ -1750,6 +1766,7 @@ async function buscarSemantico(q) {
       resultadosDiv.appendChild(item);
     });
   } catch(e) {
+    clearTimeout(avisoLento);
     buscar(q.toLowerCase()); // fallback local
   }
 }
@@ -1793,15 +1810,35 @@ function markdownLeve(txt, fuentesMap = {}) {
 }
 
 // ── Consultar (RAG generativo) ────────────────────────────────
+let consultarAbort = null;
+
 async function buscarConsultar(q) {
   if (!q) return;
+  consultarAbort?.abort();
+  consultarAbort = new AbortController();
+  const señal = consultarAbort.signal;
+
   consultarResp.innerHTML = '';
   consultarFuentes.innerHTML = '<div class="fuentes-titulo">Fuentes consultadas</div>';
+  consultarLoadTexto.textContent = 'Generando respuesta';
   consultarLoad.classList.add('visible');
   consultarPanel.classList.add('visible');
 
+  const avisoLento = setTimeout(() => {
+    consultarLoadTexto.textContent = 'El servicio estaba inactivo, reactivando el servidor... puede tardar hasta 1 minuto';
+  }, 8000);
+  const avisoReintentar = setTimeout(() => {
+    consultarLoadTexto.innerHTML = 'Sigue reactivándose... <a href="#" id="consultar-reintentar" style="color:#c9a227;text-decoration:underline">Reintentar</a>';
+    document.getElementById('consultar-reintentar')?.addEventListener('click', e => {
+      e.preventDefault();
+      buscarConsultar(q);
+    });
+  }, 45000);
+
   try {
-    const resp = await fetch(`/api/consultar?q=${encodeURIComponent(q)}&top=5`);
+    const resp = await fetch(`/api/consultar?q=${encodeURIComponent(q)}&top=5`, { signal: señal });
+    clearTimeout(avisoLento);
+    clearTimeout(avisoReintentar);
     const data = await resp.json().catch(() => null);
     if (!resp.ok) throw new Error(data?.error || 'servidor no disponible');
     if (data.error) throw new Error(data.error);
@@ -1828,6 +1865,9 @@ async function buscarConsultar(q) {
       consultarFuentes.appendChild(item);
     });
   } catch(e) {
+    clearTimeout(avisoLento);
+    clearTimeout(avisoReintentar);
+    if (e.name === 'AbortError') return; // cancelada por un reintento más nuevo
     consultarLoad.classList.remove('visible');
     consultarResp.textContent = `Error: ${e.message}. Verificá que el servidor esté corriendo.`;
   }

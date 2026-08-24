@@ -175,6 +175,11 @@ def index():
     return send_file(BASE_DIR / "galaxia.html")
 
 
+@app.route("/api/ping")
+def ping():
+    return jsonify({"ok": True})
+
+
 @app.route("/api/buscar")
 def buscar():
     q = request.args.get("q", "").strip()
