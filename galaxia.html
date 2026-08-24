@@ -164,12 +164,12 @@
     #consultar-panel {
       background: rgba(18,10,3,0.98); border: 1px solid rgba(201,162,39,0.18);
       border-radius: 0 0 12px 12px; border-top: none;
-      display: none; flex-direction: column;
+      display: none; flex-direction: column; position: relative;
       max-height: calc(100vh - 140px); overflow-y: auto;
     }
     #consultar-panel.visible { display: flex; }
     #consultar-respuesta {
-      padding: 18px 18px 12px;
+      padding: 18px 90px 12px 18px;
       font-size: 13.5px; color: #ede0c4; line-height: 1.75;
     }
     #consultar-loading {
@@ -193,7 +193,8 @@
       padding: 10px 0 4px;
     }
     .btn-tts {
-      display: none; align-items: center; gap: 6px; margin: 0 18px 12px;
+      display: none; align-items: center; gap: 6px;
+      position: absolute; top: 14px; right: 14px;
       background: rgba(201,162,39,0.08); border: 1px solid rgba(201,162,39,0.3);
       color: rgba(237,224,196,0.85); font-size: 12px; padding: 6px 12px;
       border-radius: 8px; cursor: pointer; transition: background .15s, border-color .15s, color .15s;
@@ -1845,11 +1846,25 @@ function textoPlano(txt) {
     .replace(/[[\]]/g, '');
 }
 
+// El navegador carga la lista de voces de forma asíncrona (sobre todo Chrome) —
+// esta llamada temprana la "despierta" para que esté lista antes del primer click.
+if (ttsSoportado) window.speechSynthesis.getVoices();
+
+function vozArgentina() {
+  const voces = window.speechSynthesis.getVoices();
+  return voces.find(v => v.lang?.toLowerCase() === 'es-ar')
+    || voces.find(v => v.lang?.toLowerCase() === 'es-419')
+    || voces.find(v => v.lang?.toLowerCase().startsWith('es'))
+    || null;
+}
+
 btnTts.addEventListener('click', () => {
   if (!ttsSoportado) return;
   if (window.speechSynthesis.speaking) { detenerTts(); return; }
   const utterance = new SpeechSynthesisUtterance(btnTts.dataset.texto || '');
   utterance.lang = 'es-AR';
+  const voz = vozArgentina();
+  if (voz) utterance.voice = voz;
   utterance.onend = detenerTts;
   utterance.onerror = detenerTts;
   btnTts.classList.add('hablando');
