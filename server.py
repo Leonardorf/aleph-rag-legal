@@ -44,6 +44,10 @@ app = Flask(__name__)
 CORS(app)
 
 
+class RateLimitError(Exception):
+    """El proveedor cloud (Groq) devolvió 429 — límite de consultas por minuto agotado."""
+
+
 def get_embedding(text: str) -> list:
     if BACKEND == "cloud":
         resp = requests.post(
@@ -113,10 +117,12 @@ def build_rag_prompt(query: str, chunks: list) -> str:
         "Sos un asistente legal especializado en normativa registral inmobiliaria argentina.\n"
         "Tenés acceso a fragmentos de documentos normativos. Respondé la consulta "
         "basándote ÚNICAMENTE en esos fragmentos.\n"
-        "- Tu respuesta TIENE que empezar con una conclusión directa a la consulta del usuario "
+        "- Tu respuesta TIENE que empezar con una respuesta directa a la consulta del usuario "
         "(por ejemplo 'Sí, se puede...', 'No, no es posible...', 'Depende de...'), en 1-3 oraciones. "
         "Nunca respondas solo con un listado de qué dice o no dice cada norma sin antes dar esa "
-        "conclusión — el análisis norma por norma es un respaldo de la conclusión, no un reemplazo.\n"
+        "respuesta directa — el análisis norma por norma es un respaldo de esa respuesta, no un "
+        "reemplazo. No le pongas título ni encabezado (nada de \"Conclusión:\" ni similar) — "
+        "empezá directo con el texto, sin rótulo.\n"
         f"- Como parte del razonamiento (no como toda la respuesta), revisá las {total_docs} normas "
         "a continuación UNA POR UNA antes de concluir — no te bases solo en la última que leíste.\n"
         "- Incluí TODAS las normas relevantes que encuentres, no te limites a una o dos.\n"
@@ -150,6 +156,8 @@ def get_completion(prompt: str) -> str:
             },
             timeout=60,
         )
+        if resp.status_code == 429:
+            raise RateLimitError()
         resp.raise_for_status()
         return resp.json()["choices"][0]["message"]["content"].strip()
 
@@ -244,6 +252,9 @@ def consultar():
         print(f" --- Respuesta del modelo ---")
         print(respuesta)
         print(f" --- Fin respuesta ---\n")
+    except RateLimitError:
+        print(" [ERROR] Groq: límite de consultas por minuto agotado (429)")
+        return jsonify({"error": "Demasiadas consultas seguidas, esperá un minuto y volvé a intentar."}), 429
     except Exception as e:
         origen = "Groq" if BACKEND == "cloud" else "Ollama"
         print(f" [ERROR] {origen} generación: {e}")

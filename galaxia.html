@@ -1847,6 +1847,11 @@ async function buscarConsultar(q) {
     clearTimeout(avisoLento);
     clearTimeout(avisoReintentar);
     const data = await resp.json().catch(() => null);
+    if (resp.status === 429) {
+      const err = new Error(data?.error || 'Demasiadas consultas seguidas, esperá un minuto y volvé a intentar.');
+      err.soloMensaje = true;
+      throw err;
+    }
     if (!resp.ok) throw new Error(data?.error || 'servidor no disponible');
     if (data.error) throw new Error(data.error);
 
@@ -1876,7 +1881,7 @@ async function buscarConsultar(q) {
     clearTimeout(avisoReintentar);
     if (e.name === 'AbortError') return; // cancelada por un reintento más nuevo
     consultarLoad.classList.remove('visible');
-    consultarResp.textContent = `Error: ${e.message}. Verificá que el servidor esté corriendo.`;
+    consultarResp.textContent = e.soloMensaje ? e.message : `Error: ${e.message}. Verificá que el servidor esté corriendo.`;
   }
 }
 
